@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostEmail - RetroNet Mail Suite</title>
+    <!-- Zewnętrzne SDK Firebase (wymagane przez RetroNetService) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <!-- Lokalna biblioteka systemowa ekosystemu RetroNet -->
+    <script src="RetroNetService.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f4f6f9; color: #333333; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* Ekran logowania / autoryzacji RetroNet ID */
+        #auth-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #005a9e, #0078d4); display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 200; transition: opacity 0.4s ease;
+        }
+        .net-auth-card {
+            background: #ffffff; padding: 40px; border-radius: 8px;
+            width: 420px; box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+            border: 1px solid #c8c6c4; display: flex; flex-direction: column; align-items: center;
+        }
+        .auth-logo { width: 64px; height: 64px; margin-bottom: 16px; }
+        .net-auth-card h1 { font-weight: 600; font-size: 24px; color: #004578; margin-bottom: 4px; }
+        .net-auth-card p.subtitle { font-size: 13px; color: #605e5c; margin-bottom: 24px; text-align: center; }
+
+        .input-group { width: 100%; margin-bottom: 16px; }
+        .input-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: #323130; text-transform: uppercase; letter-spacing: 0.4px; }
+        .input-wrapper { position: relative; display: flex; align-items: center; border: 1px solid #8a8886; border-radius: 4px; overflow: hidden; background: #fff; width: 100%; }
+        .net-input { width: 100%; padding: 10px 12px; border: none; color: #323130; font-size: 14px; outline: none; }
+        .domain-tag { background: #f3f2f1; color: #605e5c; padding: 10px 12px; font-size: 13px; white-space: nowrap; border-left: 1px solid #8a8886; font-weight: 500; }
+
+        .net-btn {
+            background: #0078d4; color: white; border: none; padding: 11px 20px;
+            font-size: 14px; cursor: pointer; width: 100%; font-weight: 600; border-radius: 4px;
+            transition: background 0.2s; margin-top: 8px;
+        }
+        .net-btn:hover { background: #106ebe; }
+        .net-btn.secondary { background: #f3f2f1; color: #323130; border: 1px solid #8a8886; margin-top: 6px; }
+        .net-btn.secondary:hover { background: #edebe9; }
+
+        .error-msg { color: #a80000; font-size: 12px; margin-top: 10px; text-align: center; width: 100%; }
+
+        /* Główny interfejs aplikacji */
+        #app-screen { display: none; height: 100%; flex-direction: column; background: #f4f6f9; }
+        
+        header { background: #005a9e; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
+        .header-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 18px; }
+        .header-brand svg { width: 32px; height: 32px; }
+        
+        .global-search { display: flex; align-items: center; background: rgba(255,255,255,0.15); border-radius: 4px; padding: 4px 10px; width: 380px; border: 1px solid rgba(255,255,255,0.2); }
+        .global-search input { background: transparent; border: none; color: white; outline: none; width: 100%; font-size: 13px; padding: 4px; }
+        .global-search input::placeholder { color: #d0e1fd; }
+        .global-search svg { width: 16px; height: 16px; fill: #d0e1fd; }
+
+        .user-panel { display: flex; align-items: center; gap: 15px; font-size: 13px; }
+        .logout-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 5px 12px; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+        .logout-btn:hover { background: rgba(255,255,255,0.3); }
+
+        .main-workspace { display: flex; flex: 1; overflow: hidden; }
+
+        .sidebar { width: 250px; background: #ffffff; border-right: 1px solid #e1dfdd; padding: 15px 10px; display: flex; flex-direction: column; gap: 4px; }
+        .compose-btn-wrapper { padding: 0 5px 12px 5px; }
+        .compose-main-btn {
+            background: #0078d4; color: white; border: none; padding: 10px 16px; border-radius: 4px;
+            font-size: 13px; font-weight: 600; width: 100%; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+            box-shadow: 0 2px 4px rgba(0,120,212,0.3); transition: background 0.2s;
+        }
+        .compose-main-btn:hover { background: #106ebe; }
+        .compose-main-btn svg { width: 16px; height: 16px; fill: white; }
+
+        .nav-item {
+            background: transparent; color: #323130; border: none; padding: 10px 12px; font-size: 13px; text-align: left;
+            cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; transition: background 0.15s; font-weight: 500;
+        }
+        .nav-item:hover { background: #f3f2f1; }
+        .nav-item.active { background: #e1dfdd; color: #004578; font-weight: 600; }
+        .nav-item-left { display: flex; align-items: center; gap: 10px; }
+        .nav-item-left svg { width: 16px; height: 16px; fill: #605e5c; }
+        .nav-item.active .nav-item-left svg { fill: #004578; }
+        .badge { background: #0078d4; color: white; padding: 2px 6px; font-size: 11px; border-radius: 10px; font-weight: 600; }
+
+        .content-workspace { flex: 1; display: flex; background: #ffffff; overflow: hidden; }
+
+        .mail-list-pane { width: 380px; border-right: 1px solid #e1dfdd; display: flex; flex-direction: column; background: #faf9f8; }
+        .list-action-bar { padding: 10px 14px; border-bottom: 1px solid #e1dfdd; background: #f3f2f1; display: flex; align-items: center; gap: 12px; font-size: 13px; }
+        .list-action-bar input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
+        .action-icon-btn { background: transparent; border: none; cursor: pointer; padding: 4px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+        .action-icon-btn:hover { background: #e1dfdd; }
+        .action-icon-btn svg { width: 16px; height: 16px; fill: #323130; }
+
+        .mail-items-scroll { flex: 1; overflow-y: auto; }
+        
+        .mail-card {
+            padding: 12px 14px; border-bottom: 1px solid #e1dfdd; cursor: pointer; background: #ffffff;
+            transition: background 0.15s; display: flex; align-items: flex-start; gap: 12px; position: relative; user-select: none;
+        }
+        .mail-card:hover { background: #f3f2f1; }
+        .mail-card.active { background: #eff6fc; border-left: 4px solid #0078d4; }
+        .mail-card.unread .mail-card-subject, .mail-card.unread .mail-card-sender { font-weight: 700; color: #000000; }
+        
+        .mail-card-checkbox { margin-top: 3px; cursor: pointer; width: 15px; height: 15px; }
+        .mail-card-content { flex: 1; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+        .mail-card-top { display: flex; justify-content: space-between; font-size: 12px; color: #605e5c; }
+        .mail-card-sender { font-weight: 500; color: #323130; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-card-subject { font-size: 13px; font-weight: 400; color: #323130; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-card-snippet { font-size: 12px; color: #605e5c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        #context-menu {
+            position: absolute; display: none; background: #ffffff; border: 1px solid #c8c6c4;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.14); border-radius: 4px; z-index: 1000; width: 200px; padding: 4px 0;
+        }
+        .context-menu-item {
+            padding: 8px 14px; font-size: 13px; color: #323130; cursor: pointer; display: flex; align-items: center; gap: 10px;
+        }
+        .context-menu-item:hover { background: #f3f2f1; color: #004578; }
+        .context-menu-item svg { width: 15px; height: 15px; fill: #605e5c; }
+        .context-menu-divider { height: 1px; background: #e1dfdd; margin: 4px 0; }
+
+        .mail-reader-pane { flex: 1; padding: 30px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; background: #ffffff; }
+        .reader-subject { font-size: 22px; font-weight: 600; color: #201f1e; border-bottom: 1px solid #e1dfdd; padding-bottom: 14px; }
+        .reader-meta-box { display: flex; justify-content: space-between; align-items: center; background: #faf9f8; padding: 12px 16px; border: 1px solid #e1dfdd; border-radius: 4px; font-size: 13px; color: #605e5c; }
+        .reader-body { font-size: 14px; line-height: 1.6; color: #323130; white-space: pre-wrap; padding: 10px 0; min-height: 250px; }
+
+        .compose-pane { flex: 1; padding: 30px; display: none; flex-direction: column; gap: 16px; overflow-y: auto; background: #ffffff; }
+        .compose-pane h3 { font-size: 20px; font-weight: 600; color: #004578; border-bottom: 1px solid #e1dfdd; padding-bottom: 12px; }
+        .compose-form { display: flex; flex-direction: column; gap: 12px; max-width: 750px; }
+        .compose-field { display: flex; align-items: center; border: 1px solid #8a8886; border-radius: 4px; overflow: hidden; background: #fff; }
+        .compose-field span { background: #f3f2f1; padding: 10px 14px; font-size: 13px; font-weight: 600; color: #605e5c; border-right: 1px solid #8a8886; width: 90px; }
+        .compose-field input { flex: 1; padding: 10px 12px; border: none; font-size: 14px; outline: none; }
+        .compose-textarea { width: 100%; height: 280px; padding: 14px; border: 1px solid #8a8886; border-radius: 4px; font-size: 14px; outline: none; resize: vertical; }
+
+        .empty-state { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: #8a8886; font-size: 14px; gap: 12px; text-align: center; }
+        .empty-state svg { width: 64px; height: 64px; fill: #c8c6c4; }
+    </style>
+</head>
+<body>
+
+    <!-- Ekran logowania RetroNet ID -->
+    <div id="auth-screen">
+        <div class="net-auth-card">
+            <svg class="auth-logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="64" height="64" rx="16" fill="url(#postemail-grad)"/>
+                <path d="M16 22C16 19.7909 17.7909 18 20 18H44C46.2091 18 48 19.7909 48 22V42C48 44.2091 46.2091 46 44 46H20C17.7909 46 16 44.2091 16 42V22Z" stroke="white" stroke-width="3"/>
+                <path d="M17 21L32 32L47 21" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="44" cy="20" r="3" fill="#605E5C"/>
+                <circle cx="44" cy="20" r="2" fill="#50E6FF"/>
+                <defs>
+                    <linearGradient id="postemail-grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#004578"/>
+                        <stop offset="1" stop-color="#0078D4"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+            
+            <h1 id="auth-title">PostEmail Suite</h1>
+            <p class="subtitle" id="auth-subtitle">Zaawansowana poczta ekosystemu RetroNet</p>
+            
+            <div class="input-group">
+                <label>Nazwa konta</label>
+                <div class="input-wrapper">
+                    <input type="text" id="username-input" class="net-input" placeholder="np. karol">
+                    <span class="domain-tag">@retronet.call</span>
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label>Hasło zabezpieczające</label>
+                <div class="input-wrapper">
+                    <input type="password" id="password-input" class="net-input" placeholder="••••••••" style="border:none;">
+                </div>
+            </div>
+
+            <button id="primary-action-btn" class="net-btn" onclick="handleAuthAction()">Zaloguj się</button>
+            <button id="secondary-action-btn" class="net-btn secondary" onclick="toggleAuthMode()">Nie masz konta? Zarejestruj się</button>
+            
+            <div id="auth-error" class="error-msg"></div>
+        </div>
+    </div>
+
+    <!-- Główny Interfejs Aplikacji -->
+    <div id="app-screen">
+        <header>
+            <div class="header-brand">
+                <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="64" height="64" rx="12" fill="url(#hdr-grad)"/>
+                    <path d="M16 22C16 19.7909 17.7909 18 20 18H44C46.2091 18 48 19.7909 48 22V42C48 44.2091 46.2091 46 44 46H20C17.7909 46 16 44.2091 16 42V22Z" stroke="white" stroke-width="3"/>
+                    <path d="M17 21L32 32L47 21" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="44" cy="20" r="2" fill="#50E6FF"/>
+                    <defs>
+                        <linearGradient id="hdr-grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#005A9E"/>
+                            <stop offset="1" stop-color="#0078D4"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <span>PostEmail <span style="font-size: 12px; font-weight: normal; opacity: 0.8;">(RetroNet Services)</span></span>
+            </div>
+
+            <div class="global-search">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                <input type="text" id="search-input" placeholder="Szukaj w wiadomościach..." oninput="filterEmails()">
+            </div>
+
+            <div class="user-panel">
+                <span id="current-user-display">Zalogowany</span>
+                <button class="logout-btn" onclick="RetroNet.logout()">Wyloguj</button>
+            </div>
+        </header>
+
+        <div class="main-workspace">
+            <nav class="sidebar">
+                <div class="compose-btn-wrapper">
+                    <button class="compose-main-btn" onclick="switchFolder('compose')">
+                        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                        <span>Nowa wiadomość</span>
+                    </button>
+                </div>
+
+                <button class="nav-item active" id="btn-inbox" onclick="switchFolder('inbox')">
+                    <div class="nav-item-left">
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8l7 4.5L19 8v11zm-7-7L5 6h14l-7 6z"/></svg>
+                        <span>Odbiorcze</span>
+                    </div>
+                    <span class="badge" id="inbox-badge">0</span>
+                </button>
+
+                <button class="nav-item" id="btn-sent" onclick="switchFolder('sent')">
+                    <div class="nav-item-left">
+                        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                        <span>Wysłane</span>
+                    </div>
+                </button>
+            </nav>
+
+            <div class="content-workspace">
+                <div id="list-pane" class="mail-list-pane">
+                    <div class="list-action-bar">
+                        <input type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll(this)">
+                        <button class="action-icon-btn" title="Usuń zaznaczone" onclick="deleteSelectedEmails()">
+                            <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        </button>
+                        <button class="action-icon-btn" title="Oznacz jako przeczytane" onclick="markSelectedReadStatus(true)">
+                            <svg viewBox="0 0 24 24"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.41 11.92l-1.41 1.41 5.66 5.66 12-12-1.42-1.4zM0 13.41l5.66 5.66 1.41-1.41L1.41 12 0 13.41z"/></svg>
+                        </button>
+                    </div>
+                    
+                    <div class="mail-items-scroll" id="mail-items-container">
+                        <div style="padding: 25px; text-align: center; color: #8a8886; font-size: 13px;">Wczytywanie wiadomości...</div>
+                    </div>
+                </div>
+
+                <div id="reader-pane" class="mail-reader-pane">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                        <span>Wybierz wiadomość z listy po lewej stronie, aby ją odczytać.</span>
+                    </div>
+                </div>
+
+                <div id="compose-pane" class="compose-pane">
+                    <h3>Tworzenie nowej wiadomości e-mail</h3>
+                    <div class="compose-form">
+                        <div class="compose-field">
+                            <span>Do:</span>
+                            <input type="text" id="email-to" placeholder="np. karol lub ID">
+                        </div>
+                        <div class="compose-field">
+                            <span>Temat:</span>
+                            <input type="text" id="email-subject" placeholder="Temat wiadomości">
+                        </div>
+                        <textarea class="compose-textarea" id="email-body" placeholder="Wpisz treść wiadomości..."></textarea>
+                        <button class="net-btn" style="width: auto; padding: 10px 24px;" onclick="sendEmail()">Wyślij wiadomość</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Kontekstowe HTML -->
+    <div id="context-menu">
+        <div class="context-menu-item" onclick="ctxToggleRead()">
+            <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+            <span id="ctx-read-text">Oznacz jako przeczytane</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="ctxDeleteEmail()" style="color: #a80000;">
+            <svg viewBox="0 0 24 24" fill="#a80000"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            <span>Usuń wiadomość</span>
+        </div>
+    </div>
+
+    <script>
+        let isRegisterMode = false;
+        let currentUser = null;
+        let currentFolder = "inbox";
+        let allEmails = { inbox: [], sent: [] };
+        let selectedEmailIds = new Set();
+        let targetContextEmail = null;
+
+        // Inicjalizacja przez systemową usługę RetroNet
+        RetroNet.onAuthReady((session) => {
+            if (session) {
+                currentUser = session;
+                document.getElementById('auth-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('auth-screen').style.display = 'none';
+                    document.getElementById('app-screen').style.display = 'flex';
+                    document.getElementById('current-user-display').innerText = session.fullAddress;
+                    initRealtimeListeners(session.fullAddress);
+                }, 400);
+            } else {
+                document.getElementById('auth-screen').style.display = 'flex';
+                document.getElementById('app-screen').style.display = 'none';
+            }
+        });
+
+        function toggleAuthMode() {
+            isRegisterMode = !isRegisterMode;
+            document.getElementById('auth-title').innerText = isRegisterMode ? "Rejestracja PostEmail" : "PostEmail Suite";
+            document.getElementById('primary-action-btn').innerText = isRegisterMode ? "Zarejestruj się" : "Zaloguj się";
+            document.getElementById('secondary-action-btn').innerText = isRegisterMode ? "Masz już konto? Zaloguj się" : "Nie masz konta? Zarejestruj się";
+            document.getElementById('auth-error').innerText = "";
+        }
+
+        function handleAuthAction() {
+            const u = document.getElementById('username-input').value.trim();
+            const p = document.getElementById('password-input').value;
+            const err = document.getElementById('auth-error');
+            err.innerText = "";
+
+            if (!u || !p) {
+                err.innerText = "Wypełnij nazwę konta oraz hasło!";
+                return;
+            }
+
+            if (isRegisterMode) {
+                RetroNet.register(u, p).catch(e => err.innerText = e.message);
+            } else {
+                RetroNet.login(u, p).catch(e => err.innerText = e.message);
+            }
+        }
+
+        function switchFolder(folder) {
+            currentFolder = folder;
+            selectedEmailIds.clear();
+            const selectAll = document.getElementById('select-all-checkbox');
+            if (selectAll) selectAll.checked = false;
+
+            document.getElementById('btn-inbox').classList.toggle('active', folder === 'inbox');
+            document.getElementById('btn-sent').classList.toggle('active', folder === 'sent');
+
+            const listPane = document.getElementById('list-pane');
+            const readerPane = document.getElementById('reader-pane');
+            const composePane = document.getElementById('compose-pane');
+
+            if (folder === 'compose') {
+                listPane.style.display = 'none';
+                readerPane.style.display = 'none';
+                composePane.style.display = 'flex';
+            } else {
+                listPane.style.display = 'flex';
+                composePane.style.display = 'none';
+                readerPane.style.display = 'flex';
+                renderEmailList(allEmails[folder]);
+            }
+        }
+
+        function initRealtimeListeners(myAddress) {
+            RetroNet.db.collection('emails').where('to', '==', myAddress)
+                .onSnapshot((snapshot) => {
+                    allEmails.inbox = [];
+                    snapshot.forEach(doc => allEmails.inbox.push({ id: doc.id, ...doc.data() }));
+                    allEmails.inbox.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                    
+                    const badge = document.getElementById('inbox-badge');
+                    if (badge) badge.innerText = allEmails.inbox.filter(e => !e.read).length;
+                    if (currentFolder === 'inbox') renderEmailList(allEmails.inbox);
+                });
+
+            RetroNet.db.collection('emails').where('from', '==', myAddress)
+                .onSnapshot((snapshot) => {
+                    allEmails.sent = [];
+                    snapshot.forEach(doc => allEmails.sent.push({ id: doc.id, ...doc.data() }));
+                    allEmails.sent.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                    if (currentFolder === 'sent') renderEmailList(allEmails.sent);
+                });
+        }
+
+        function renderEmailList(emails) {
+            const container = document.getElementById('mail-items-container');
+            container.innerHTML = "";
+
+            if (!emails || emails.length === 0) {
+                container.innerHTML = `<div style="padding: 25px; color: #8a8886; font-size: 13px; text-align: center;">Brak wiadomości w tym folderze.</div>`;
+                return;
+            }
+
+            emails.forEach((email) => {
+                const item = document.createElement('div');
+                item.className = `mail-card ${!email.read && currentFolder === 'inbox' ? 'unread' : ''}`;
+                
+                item.onclick = (e) => {
+                    if (e.target.tagName !== 'INPUT') openEmail(email, item);
+                };
+
+                item.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    showContextMenu(e, email);
+                };
+
+                const contactDisplay = currentFolder === 'inbox' ? email.from : email.to;
+                const dateStr = email.timestamp ? new Date(email.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Teraz';
+                const isChecked = selectedEmailIds.has(email.id) ? 'checked' : '';
+
+                item.innerHTML = `
+                    <input type="checkbox" class="mail-card-checkbox" ${isChecked} onclick="toggleSelectEmail('${email.id}', event)">
+                    <div class="mail-card-content">
+                        <div class="mail-card-top">
+                            <span class="mail-card-sender">${contactDisplay}</span>
+                            <span>${dateStr}</span>
+                        </div>
+                        <div class="mail-card-subject">${email.subject || '(Bez tematu)'}</div>
+                        <div class="mail-card-snippet">${email.body || ''}</div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function openEmail(email, element) {
+            document.querySelectorAll('.mail-card').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+
+            if (!email.read && currentFolder === 'inbox') {
+                RetroNet.db.collection('emails').doc(email.id).update({ read: true });
+            }
+
+            const reader = document.getElementById('reader-pane');
+            const dateFull = email.timestamp ? new Date(email.timestamp.seconds * 1000).toLocaleString() : 'Teraz';
+
+            reader.innerHTML = `
+                <div class="reader-subject">${email.subject || '(Bez tematu)'}</div>
+                <div class="reader-meta-box">
+                    <div><strong>${currentFolder === 'inbox' ? 'Od:' : 'Do:'}</strong> ${currentFolder === 'inbox' ? email.from : email.to}</div>
+                    <div>${dateFull}</div>
+                </div>
+                <div class="reader-body">${email.body || ''}</div>
+            `;
+        }
+
+        // Menu kontekstowe (prawy przycisk)
+        function showContextMenu(e, email) {
+            targetContextEmail = email;
+            const menu = document.getElementById('context-menu');
+            document.getElementById('ctx-read-text').innerText = email.read ? "Oznacz jako nieprzeczytane" : "Oznacz jako przeczytane";
+            
+            menu.style.display = 'block';
+            menu.style.left = e.pageX + 'px';
+            menu.style.top = e.pageY + 'px';
+        }
+
+        document.addEventListener('click', () => {
+            document.getElementById('context-menu').style.display = 'none';
+        });
+
+        function ctxToggleRead() {
+            if (!targetContextEmail) return;
+            RetroNet.db.collection('emails').doc(targetContextEmail.id).update({ read: !targetContextEmail.read });
+        }
+
+        function ctxDeleteEmail() {
+            if (!targetContextEmail) return;
+            if (confirm("Czy na pewno chcesz usunąć tę wiadomość?")) {
+                RetroNet.db.collection('emails').doc(targetContextEmail.id).delete();
+            }
+        }
+
+        // Selekcja grupowa i akcje masowe
+        function toggleSelectEmail(id, event) {
+            event.stopPropagation();
+            if (selectedEmailIds.has(id)) {
+                selectedEmailIds.delete(id);
+            } else {
+                selectedEmailIds.add(id);
+            }
+        }
+
+        function toggleSelectAll(masterCheckbox) {
+            const currentList = allEmails[currentFolder] || [];
+            if (masterCheckbox.checked) {
+                currentList.forEach(e => selectedEmailIds.add(e.id));
+            } else {
+                selectedEmailIds.clear();
+            }
+            renderEmailList(currentList);
+        }
+
+        function deleteSelectedEmails() {
+            if (selectedEmailIds.size === 0) return alert("Zaznacz co najmniej jedną wiadomość do usunięcia!");
+            if (confirm(`Czy chcesz usunąć ${selectedEmailIds.size} zaznaczone wiadomości?`)) {
+                const batch = RetroNet.db.batch();
+                selectedEmailIds.forEach(id => {
+                    batch.delete(RetroNet.db.collection('emails').doc(id));
+                });
+                batch.commit().then(() => {
+                    selectedEmailIds.clear();
+                    document.getElementById('select-all-checkbox').checked = false;
+                });
+            }
+        }
+
+        function markSelectedReadStatus(status) {
+            if (selectedEmailIds.size === 0) return alert("Zaznacz co najmniej jedną wiadomość!");
+            const batch = RetroNet.db.batch();
+            selectedEmailIds.forEach(id => {
+                batch.update(RetroNet.db.collection('emails').doc(id), { read: status });
+            });
+            batch.commit().then(() => {
+                selectedEmailIds.clear();
+                document.getElementById('select-all-checkbox').checked = false;
+            });
+        }
+
+        function sendEmail() {
+            let toInput = document.getElementById('email-to').value.trim().toLowerCase();
+            const subject = document.getElementById('email-subject').value.trim();
+            const body = document.getElementById('email-body').value.trim();
+
+            if (!toInput || !subject || !body) return alert("Wypełnij wszystkie pola formularza!");
+
+            if (!toInput.includes('@')) toInput += RetroNet.suffix;
+
+            RetroNet.db.collection('emails').add({
+                from: currentUser.fullAddress,
+                to: toInput,
+                subject: subject,
+                body: body,
+                read: false,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                alert("Wiadomość została wysłana w sieci RetroNet!");
+                document.getElementById('email-to').value = "";
+                document.getElementById('email-subject').value = "";
+                document.getElementById('email-body').value = "";
+                switchFolder('sent');
+            }).catch((err) => {
+                alert("Błąd wysyłania: " + err.message);
+            });
+        }
+
+        function filterEmails() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const listToFilter = allEmails[currentFolder] || [];
+            const filtered = listToFilter.filter(e => 
+                (e.subject && e.subject.toLowerCase().includes(query)) ||
+                (e.body && e.body.toLowerCase().includes(query)) ||
+                (e.from && e.from.toLowerCase().includes(query)) ||
+                (e.to && e.to.toLowerCase().includes(query))
+            );
+            renderEmailList(filtered);
+        }
+    </script>
+</body>
+</html>
