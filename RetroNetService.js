@@ -1,8 +1,8 @@
 /**
- * RetroNetService.js - Realny rdzeń procesów systemowych i autoryzacji ekosystemu RetroNet
+ * RetroNetService.js - Realny rdzeń procesów i autoryzacji ekosystemu RetroNet
  * Stworzone przez: Karol Kopeć (14 lat, klasa 7)
  * Szkoła Podstawowa nr 11 z Oddziałami Integracyjnymi im. Kornela Makuszyńskiego w Białymstoku (ul. Sienkiewicza)
- * Rok utworzenia: 2026 | Fundament przyszłej struktury firmowej
+ * Rok utworzenia: 2026 | Fundament firmowy
  */
 (function (window) {
     window.RetroNetService = {
@@ -26,13 +26,11 @@
                 db: db,
                 suffix: SUFFIX,
 
-                // Metoda wykorzystująca bibliotekę unpackge do dekodowania i walidacji paczki rejestracyjnej
                 unpackRegistrationPackage: function (rawPackageData) {
                     try {
                         if (typeof unpackge !== 'undefined' && typeof unpackge.extract === 'function') {
                             return unpackge.extract(rawPackageData);
                         }
-                        // Fallback struktur binarnych / systemowych pod kątem przyszłej biblioteki firmowej
                         return JSON.parse(atob(rawPackageData));
                     } catch (err) {
                         console.error("RetroNetService [unpackge]: Błąd rozpakowywania kontenera danych:", err);
