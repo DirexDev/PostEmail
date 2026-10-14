@@ -3,119 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RetroNet ID - Autoryzacja Catppa & unpackge</title>
+    <title>PostEmail - RetroNet Workspace</title>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <!-- Serwis RetroNet -->
+    <!-- RetroNet Core Service -->
     <script src="RetroNetService.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', 'Segoe UI', Arial, sans-serif; }
-        body { background-color: #ffffff; color: #1f1f1f; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        body { background-color: #ffffff; color: #1f1f1f; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-        .google-auth-card {
-            background: #ffffff; width: 450px; border-radius: 28px;
-            border: 1px solid #dadce0; padding: 40px; display: flex; flex-direction: column; align-items: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08); position: relative;
+        /* Górny pasek w stylu Google / Gmail */
+        header { background: #ffffff; color: #1f1f1f; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dadce0; }
+        .header-brand { font-weight: 500; font-size: 18px; color: #0b57d0; display: flex; align-items: center; gap: 8px; }
+        
+        .user-panel { display: flex; align-items: center; gap: 15px; font-size: 14px; }
+        .user-badge-pill { background: #c2e7ff; color: #001d35; padding: 6px 16px; border-radius: 100px; font-weight: 500; font-size: 13px; }
+        .logout-btn { background: #f1f3f4; border: 1px solid #dadce0; color: #b3261e; padding: 8px 16px; cursor: pointer; font-weight: 500; border-radius: 100px; font-size: 13px; }
+        .logout-btn:hover { background: #fce8e6; }
+
+        /* Główny obszar roboczy */
+        .main-workspace { display: flex; flex: 1; overflow: hidden; }
+
+        .sidebar { width: 260px; background: #f8f9fa; border-right: 1px solid #dadce0; padding: 20px 12px; display: flex; flex-direction: column; gap: 6px; justify-content: space-between; }
+        .sidebar-top { display: flex; flex-direction: column; gap: 6px; }
+
+        .compose-main-btn {
+            background: #c2e7ff; color: #001d35; border: none; padding: 14px 20px; 
+            font-size: 14px; font-weight: 500; width: 100%; cursor: pointer; margin-bottom: 12px; border-radius: 16px; text-align: left;
+            display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
+        .compose-main-btn:hover { background: #b3dffc; }
+        .compose-icon-svg { width: 18px; height: 18px; fill: #001d35; }
+
+        .nav-item {
+            background: transparent; color: #444746; border: none; padding: 12px 16px; font-size: 14px; text-align: left;
+            cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-weight: 500; border-radius: 0 100px 100px 0; margin-right: 10px;
+        }
+        .nav-item:hover { background: #eef2f5; color: #1f1f1f; }
+        .nav-item.active { background: #d3e3fd; color: #041e49; font-weight: 600; }
+        .nav-label-group { display: flex; align-items: center; gap: 12px; }
+        .nav-icon { width: 18px; height: 18px; fill: #444746; }
+        .nav-item.active .nav-icon { fill: #041e49; }
+        .badge { background: #0b57d0; color: white; padding: 2px 8px; font-size: 12px; font-weight: bold; border-radius: 100px; }
+
+        .content-workspace { flex: 1; display: flex; background: #ffffff; overflow: hidden; }
+        .mail-list-pane { width: 380px; border-right: 1px solid #dadce0; display: flex; flex-direction: column; background: #ffffff; }
+        .list-action-bar { padding: 12px 16px; border-bottom: 1px solid #dadce0; background: #ffffff; display: flex; align-items: center; gap: 12px; }
+        .action-icon-btn { background: #f1f3f4; border: 1px solid #dadce0; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #1f1f1f; border-radius: 6px; }
+        .action-icon-btn:hover { background: #e8eaed; }
+        .action-icon-svg { width: 14px; height: 14px; fill: #1f1f1f; }
+
+        .mail-items-scroll { flex: 1; overflow-y: auto; }
+        .mail-card {
+            padding: 14px 16px; border-bottom: 1px solid #dadce0; cursor: pointer; background: #ffffff;
+            transition: background 0.1s; display: flex; align-items: flex-start; gap: 12px;
+        }
+        .mail-card:hover { background: #f8f9fa; }
+        .mail-card.active { background: #d3e3fd; }
+        .mail-card.unread .mail-card-subject, .mail-card.unread .mail-card-sender { font-weight: 700; color: #000; }
         
-        .retronet-logo-svg { width: 70px; height: 70px; margin-bottom: 8px; filter: drop-shadow(0px 3px 5px rgba(0, 120, 215, 0.3)); }
+        .mail-card-content { flex: 1; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+        .mail-card-top { display: flex; justify-content: space-between; font-size: 12px; color: #5e5e5e; }
+        .mail-card-sender { font-weight: 500; color: #1f1f1f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-card-subject { font-size: 14px; color: #1f1f1f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-card-snippet { font-size: 12px; color: #5e5e5e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        .google-title { font-size: 24px; font-weight: 400; color: #1f1f1f; margin-bottom: 8px; text-align: center; }
-        .google-subtitle { font-size: 15px; color: #444746; margin-bottom: 30px; text-align: center; }
+        .mail-reader-pane { flex: 1; padding: 40px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; background: #ffffff; color: #1f1f1f; }
+        .reader-subject { font-size: 24px; font-weight: 400; color: #1f1f1f; border-bottom: 1px solid #dadce0; padding-bottom: 16px; }
+        .reader-meta-box { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 14px 18px; border: 1px solid #dadce0; border-radius: 8px; font-size: 13px; color: #444746; }
+        .reader-body { font-size: 15px; line-height: 1.7; color: #1f1f1f; white-space: pre-wrap; }
 
-        .google-input-container { width: 100%; margin-bottom: 20px; position: relative; }
-        .google-input-field { width: 100%; padding: 16px; border: 1px solid #747775; border-radius: 4px; font-size: 16px; outline: none; background: transparent; color: #1f1f1f; transition: border-color 0.2s; }
-        .google-input-field:focus { border-color: #0b57d0; border-width: 2px; padding: 15px; }
+        .creator-info-pane { flex: 1; padding: 40px; display: none; flex-direction: column; gap: 20px; background: #ffffff; color: #1f1f1f; overflow-y: auto; }
+        .creator-info-pane h2 { font-size: 24px; color: #0b57d0; border-bottom: 1px solid #dadce0; padding-bottom: 12px; font-weight: 400; }
+        .creator-card-box { background: #f8f9fa; border: 1px solid #dadce0; border-radius: 16px; padding: 30px; display: flex; flex-direction: column; gap: 14px; font-size: 15px; color: #1f1f1f; line-height: 1.7; }
+        .creator-card-box strong { color: #0b57d0; }
 
-        .google-actions { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px; }
-        
+        .compose-pane { flex: 1; padding: 40px; display: none; flex-direction: column; gap: 20px; overflow-y: auto; background: #ffffff; }
+        .compose-pane h3 { font-size: 22px; font-weight: 400; color: #1f1f1f; border-bottom: 1px solid #dadce0; padding-bottom: 14px; }
+        .compose-form { display: flex; flex-direction: column; gap: 16px; max-width: 800px; }
+        .compose-field { display: flex; align-items: center; border: 1px solid #747775; border-radius: 8px; background: #fff; overflow: hidden; }
+        .compose-field span { background: #f8f9fa; padding: 12px 16px; font-size: 13px; font-weight: 500; color: #444746; border-right: 1px solid #747775; width: 100px; }
+        .compose-field input { flex: 1; padding: 12px 14px; border: none; font-size: 15px; outline: none; background: transparent; color: #1f1f1f; }
+        .compose-textarea { width: 100%; height: 320px; padding: 16px; border: 1px solid #747775; border-radius: 8px; font-size: 15px; outline: none; resize: vertical; background: #fff; color: #1f1f1f; }
+
         .google-btn-primary {
             background: #0b57d0; color: white; border: none; padding: 10px 24px;
             font-size: 14px; cursor: pointer; font-weight: 500; border-radius: 100px;
-            transition: background 0.2s;
+            transition: background 0.2s; display: inline-flex; align-items: center; justify-content: center;
         }
         .google-btn-primary:hover { background: #0842a0; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
-        .google-btn-text { background: transparent; color: #0b57d0; border: none; font-size: 14px; font-weight: 500; cursor: pointer; padding: 10px; }
-        .google-btn-text:hover { background: rgba(11, 87, 208, 0.04); border-radius: 100px; }
-
-        .catppa-auth-box {
-            background: #f8f9fa; border: 1px solid #dadce0; border-radius: 12px; padding: 16px;
-            width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: center; margin-bottom: 20px;
-        }
-        .catppa-title { font-size: 13px; font-weight: 500; color: #444746; text-align: center; }
-        .catppa-code-display { font-size: 18px; font-weight: bold; color: #0b57d0; letter-spacing: 2px; background: #fff; padding: 8px 16px; border-radius: 6px; border: 1px dashed #0b57d0; }
-
-        #account-type-dropdown {
-            position: absolute; bottom: 70px; left: 40px; background: #ffffff; border: 1px solid #dadce0;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.15); border-radius: 12px; width: 280px; z-index: 300; display: none; padding: 8px 0;
-        }
-        .dropdown-option { padding: 12px 20px; font-size: 14px; color: #1f1f1f; cursor: pointer; display: flex; align-items: center; gap: 10px; }
-        .dropdown-option:hover { background: #f8f9fa; color: #0b57d0; }
-
-        .error-msg { color: #b3261e; font-size: 13px; text-align: center; margin-top: 15px; font-weight: 500; }
+        .empty-state { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: #5e5e5e; font-size: 15px; gap: 12px; text-align: center; font-weight: 500; }
     </style>
 </head>
 <body>
 
-    <div class="google-auth-card">
-        <!-- Kaligraficzna litera R z błękitnym wykończeniem Aero-Blue -->
-        <svg class="retronet-logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="aeroBlueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stop-color="#33b5e5" />
-                    <stop offset="50%" stop-color="#0085cf" />
-                    <stop offset="100%" stop-color="#004385" />
-                </linearGradient>
-                <linearGradient id="aeroHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6" />
-                    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0" />
-                </linearGradient>
-            </defs>
-            <path fill="url(#aeroBlueGrad)" stroke="#002d5a" stroke-width="1.5" d="M22,25 C15,18 35,8 45,18 C55,28 35,42 22,40 C18,39 16,33 25,32 C35,31 42,38 48,45 C55,53 62,62 70,72 C75,78 82,85 88,80 C93,76 85,70 80,65 C70,55 58,42 48,32 C58,30 68,22 65,12 C62,4 42,8 35,16 C28,24 25,22 22,25 Z"/>
-            <path fill="url(#aeroBlueGrad)" stroke="#002d5a" stroke-width="1.5" d="M28,15 C26,35 24,55 22,75 C21,83 29,85 32,80 C34,75 35,45 36,35 C42,35 55,38 62,48 C69,58 75,72 82,82 C85,86 92,80 88,75 C80,62 70,48 62,38 C54,28 42,22 28,15 Z"/>
-            <path fill="url(#aeroHighlight)" d="M29,17 C35,20 48,25 54,32 C42,33 34,26 29,17 Z"/>
-        </svg>
+    <header>
+        <div class="header-brand">
+            <span>PostEmail</span> <span style="font-size: 13px; font-weight: normal; color: #5e5e5e;">(RetroNet Workspace)</span>
+        </div>
+        <div class="user-panel">
+            <!-- Wyświetlanie pełnego adresu z końcówką @retronet.call -->
+            <span class="user-badge-pill" id="current-user-email">Ładowanie adresu...</span>
+            <button class="logout-btn" onclick="netService.logout()">Wyloguj</button>
+        </div>
+    </header>
 
-        <div class="google-title" id="auth-main-title">Zaloguj się</div>
-        <div class="google-subtitle" id="auth-main-subtitle">do ekosystemu RetroNet-Call</div>
-        
-        <div id="step-credentials" style="width: 100%;">
-            <div class="google-input-container">
-                <input type="text" id="username-input" class="google-input-field" placeholder="Nazwa konta (np. karol)">
+    <div class="main-workspace">
+        <nav class="sidebar">
+            <div class="sidebar-top">
+                <button class="compose-main-btn" onclick="switchFolder('compose')">
+                    <svg class="compose-icon-svg" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    Nowa wiadomość
+                </button>
+                <button class="nav-item active" id="btn-inbox" onclick="switchFolder('inbox')">
+                    <div class="nav-label-group">
+                        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8l7 5 7-5v11zm-7-7L5 6h14l-7 6z"/></svg>
+                        <span>Odbiorcze</span>
+                    </div>
+                    <span class="badge" id="inbox-badge">0</span>
+                </button>
+                <button class="nav-item" id="btn-sent" onclick="switchFolder('sent')">
+                    <div class="nav-label-group">
+                        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                        <span>Wysłane</span>
+                    </div>
+                </button>
+                <button class="nav-item" id="btn-creator" onclick="switchFolder('creator')">
+                    <div class="nav-label-group">
+                        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                        <span>O twórcy</span>
+                    </div>
+                </button>
+            </div>
+        </nav>
+
+        <div class="content-workspace">
+            <div id="list-pane" class="mail-list-pane">
+                <div class="list-action-bar">
+                    <button class="action-icon-btn" title="Usuń zaznaczone" onclick="deleteSelectedEmails()">
+                        <svg class="action-icon-svg" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        Usuń
+                    </button>
+                    <button class="action-icon-btn" title="Oznacz jako przeczytane" onclick="markSelectedReadStatus(true)">
+                        <svg class="action-icon-svg" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+                        Przeczytane
+                    </button>
+                </div>
+                <div class="mail-items-scroll" id="mail-items-container">
+                    <div style="padding: 25px; text-align: center; color: #5e5e5e; font-size: 13px;">Wczytywanie wiadomości...</div>
+                </div>
             </div>
 
-            <div class="google-input-container" id="password-container">
-                <input type="password" id="password-input" class="google-input-field" placeholder="Wprowadź hasło">
+            <div id="reader-pane" class="mail-reader-pane">
+                <div class="empty-state">Wybierz wiadomość z listy po lewej stronie.</div>
             </div>
 
-            <div class="google-input-container" id="age-container" style="display: none;">
-                <input type="number" id="age-input" class="google-input-field" placeholder="Twój wiek (np. 14)">
-            </div>
-
-            <!-- Autoryzacja Catppa (unpackge) -->
-            <div class="catppa-auth-box" id="catppa-container" style="display: none;">
-                <div class="catppa-title">Weryfikacja Catppa (unpackge)</div>
-                <div class="catppa-code-display" id="catppa-target-code">---</div>
-                <input type="text" id="catppa-input" class="google-input-field" placeholder="Wpisz token Catppa" style="background: #fff; padding: 10px; text-align: center;">
-            </div>
-
-            <div class="google-actions">
-                <div style="position: relative;">
-                    <button id="create-account-toggle" class="google-btn-text" onclick="toggleAccountMenu()">Utwórz konto</button>
-                    <div id="account-type-dropdown">
-                        <div class="dropdown-option" onclick="selectAccountType('personal')">Do użytku osobistego</div>
-                        <div class="dropdown-option" onclick="selectAccountType('child')">Dla dziecka</div>
-                        <div class="dropdown-option" onclick="selectAccountType('work')">Do pracy lub celów biznesowych</div>
+            <div id="creator-pane" class="creator-info-pane">
+                <h2>Informacje o twórcy i usłudze</h2>
+                <div class="creator-card-box">
+                    <div><strong>Twórca projektu:</strong> Karol Kopeć</div>
+                    <div><strong>Wiek:</strong> 14 lat (klasa 7)</div>
+                    <div><strong>Szkoła:</strong> Szkoła Podstawowa nr 11 z Oddziałami Integracyjnymi im. Kornela Makuszyńskiego w Białymstoku (ul. Sienkiewicza)</div>
+                    <div><strong>Rok utworzenia:</strong> 2026</div>
+                    <div><strong>Wersja usługi:</strong> PostEmail v3.9 (Full Address Display)</div>
+                    <div><strong>System autoryzacji:</strong> RetroNet OS Auth v2.0</div>
+                    <div style="margin-top: 10px; font-size: 13px; color: #5e5e5e; border-top: 1px solid #dadce0; padding-top: 12px; font-weight: 500;">
+                        Wszystkie prawa autorskie do architektury ekosystemu RetroNet należą do twórcy.
                     </div>
                 </div>
-                <button id="primary-action-btn" class="google-btn-primary" onclick="handleAuthAction()">Dalej</button>
+            </div>
+
+            <div id="compose-pane" class="compose-pane">
+                <h3>Nowa wiadomość e-mail</h3>
+                <div class="compose-form">
+                    <div class="compose-field"><span>Do:</span><input type="text" id="email-to" placeholder="np. karol"></div>
+                    <div class="compose-field"><span>Temat:</span><input type="text" id="email-subject" placeholder="Temat"></div>
+                    <textarea class="compose-textarea" id="email-body" placeholder="Treść wiadomości..."></textarea>
+                    <button class="google-btn-primary" style="width: auto; padding: 12px 30px;" onclick="sendEmail()">Wyślij wiadomość</button>
+                </div>
             </div>
         </div>
+    </div>
 
-        <div id="auth-error" class="error-msg"></div>
+    <!-- Menu Kontekstowe -->
+    <div id="context-menu" style="position: absolute; display: none; background: #ffffff; border: 1px solid #dadce0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; width: 180px; padding: 4px 0; border-radius: 8px;">
+        <div style="padding: 10px 14px; font-size: 13px; cursor: pointer; color: #1f1f1f; font-weight: 500;" onclick="ctxToggleRead()">Zmień stan</div>
+        <div style="height: 1px; background: #dadce0; margin: 2px 0;"></div>
+        <div style="padding: 10px 14px; font-size: 13px; cursor: pointer; color: #b3261e; font-weight: 500;" onclick="ctxDeleteEmail()">Usuń</div>
     </div>
 
     <script>
@@ -131,85 +208,165 @@
         };
 
         let netService = null;
-        let isRegisterMode = false;
-        let selectedAccountType = "personal";
-        let activeCatppaToken = "";
+        let currentUser = null;
+        let currentFolder = "inbox";
+        let allEmails = { inbox: [], sent: [] };
+        let selectedEmailIds = new Set();
+        let targetContextEmail = null;
 
         window.addEventListener('DOMContentLoaded', () => {
             if (typeof RetroNetService === 'undefined') {
                 alert("Błąd: Brak pliku RetroNetService.js!");
                 return;
             }
+
             netService = RetroNetService.init(apiConfig.urlfirebase);
 
-            netService.auth.onAuthStateChanged((user) => {
-                if (user) window.location.href = "index.html";
+            // Pobieranie nazwy z URL (przekazanej z Auth.html) lub Firebase Auth
+            const urlParams = new URLSearchParams(window.location.search);
+            let paramName = urlParams.get('name');
+            if (!paramName) {
+                paramName = localStorage.getItem("retronet_active_user");
+            }
+
+            netService.onAuthReady((session) => {
+                if (session) {
+                    currentUser = session;
+                    // Wyświetlenie pełnego adresu z końcówką @retronet.call w górnym panelu
+                    document.getElementById('current-user-email').innerText = session.fullAddress;
+                    initListeners(session.fullAddress);
+                } else if (paramName) {
+                    const clean = paramName.trim().toLowerCase().replace(netService.suffix, '');
+                    currentUser = {
+                        username: clean,
+                        fullAddress: clean + netService.suffix,
+                        peerId: clean
+                    };
+                    document.getElementById('current-user-email').innerText = currentUser.fullAddress;
+                    initListeners(currentUser.fullAddress);
+                } else {
+                    window.location.href = "Auth.html";
+                }
             });
         });
 
-        function toggleAccountMenu() {
-            const dropdown = document.getElementById('account-type-dropdown');
-            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        function initListeners(address) {
+            netService.db.collection('emails').where('to', '==', address)
+                .onSnapshot(snap => {
+                    allEmails.inbox = [];
+                    snap.forEach(doc => allEmails.inbox.push({ id: doc.id, ...doc.data() }));
+                    allEmails.inbox.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                    document.getElementById('inbox-badge').innerText = allEmails.inbox.filter(e => !e.read).length;
+                    if (currentFolder === 'inbox') renderList(allEmails.inbox);
+                });
+
+            netService.db.collection('emails').where('from', '==', address)
+                .onSnapshot(snap => {
+                    allEmails.sent = [];
+                    snap.forEach(doc => allEmails.sent.push({ id: doc.id, ...doc.data() }));
+                    allEmails.sent.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                    if (currentFolder === 'sent') renderList(allEmails.sent);
+                });
         }
 
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#create-account-toggle') && !e.target.closest('#account-type-dropdown')) {
-                document.getElementById('account-type-dropdown').style.display = 'none';
+        function renderList(list) {
+            const container = document.getElementById('mail-items-container');
+            container.innerHTML = "";
+            if (list.length === 0) {
+                container.innerHTML = `<div style="padding: 25px; text-align: center; color: #5e5e5e; font-size: 13px;">Brak wiadomości.</div>`;
+                return;
             }
-        });
 
-        function selectAccountType(type) {
-            selectedAccountType = type;
-            document.getElementById('account-type-dropdown').style.display = 'none';
-            isRegisterMode = true;
+            list.forEach(email => {
+                const item = document.createElement('div');
+                item.className = `mail-card ${!email.read && currentFolder === 'inbox' ? 'unread' : ''}`;
+                item.onclick = (e) => { if (e.target.tagName !== 'INPUT') openEmail(email, item); };
+                item.oncontextmenu = (e) => { e.preventDefault(); showCtx(e, email); };
 
-            document.getElementById('auth-main-title').innerText = "Utwórz konto RetroNet-Call";
-            document.getElementById('auth-main-subtitle').innerText = type === 'child' ? "Dla dziecka" : (type === 'work' ? " Do pracy lub celów biznesowych" : "Do użytku osobistego");
-            document.getElementById('create-account-toggle').style.display = 'none';
-            document.getElementById('primary-action-btn').innerText = "Zarejestruj konto";
-
-            document.getElementById('age-container').style.display = 'block';
-            document.getElementById('catppa-container').style.display = 'flex';
-
-            // Generowanie i ekstrakcja tokena Catppa przez unpackge
-            activeCatppaToken = "CATPPA-" + Math.floor(1000 + Math.random() * 9000);
-            const containerPayload = JSON.stringify({ catppaToken: activeCatppaToken, timestamp: Date.now() });
-            const packedContainer = btoa(containerPayload);
-            const unpackedCatppa = netService.unpackRegistrationPackage(packedContainer);
-
-            document.getElementById('catppa-target-code').innerText = unpackedCatppa ? unpackedCatppa.catppaToken : activeCatppaToken;
-            document.getElementById('auth-error').innerText = "";
+                const contact = currentFolder === 'inbox' ? email.from : email.to;
+                item.innerHTML = `
+                    <input type="checkbox" onclick="toggleSelect('${email.id}', event)">
+                    <div class="mail-card-content">
+                        <div class="mail-card-top"><span>${contact}</span></div>
+                        <div class="mail-card-subject">${email.subject || '(Bez tematu)'}</div>
+                        <div class="mail-card-snippet">${email.body || ''}</div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
         }
 
-        function handleAuthAction() {
-            const u = document.getElementById('username-input').value.trim().toLowerCase();
-            const p = document.getElementById('password-input').value;
-            const err = document.getElementById('auth-error');
-            err.innerText = "";
+        function openEmail(email, el) {
+            document.querySelectorAll('.mail-card').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            if (!email.read && currentFolder === 'inbox') {
+                netService.db.collection('emails').doc(email.id).update({ read: true });
+            }
+            document.getElementById('reader-pane').innerHTML = `
+                <div class="reader-subject">${email.subject}</div>
+                <div class="reader-meta-box"><div><strong>Od:</strong> ${email.from}</div></div>
+                <div class="reader-body">${email.body}</div>
+            `;
+        }
 
-            if (!u || !p) return err.innerText = "Wpisz nazwę konta oraz hasło.";
+        function switchFolder(folder) {
+            currentFolder = folder;
+            document.getElementById('btn-inbox').classList.toggle('active', folder === 'inbox');
+            document.getElementById('btn-sent').classList.toggle('active', folder === 'sent');
+            document.getElementById('btn-creator').classList.toggle('active', folder === 'creator');
 
-            if (!isRegisterMode) {
-                netService.login(u, p).then(() => {
-                    window.location.href = "index.html";
-                }).catch(e => err.innerText = "Błąd logowania: " + e.message);
-            } else {
-                const age = document.getElementById('age-input').value.trim();
-                const enteredCatppa = document.getElementById('catppa-input').value.trim();
+            const listPane = document.getElementById('list-pane');
+            const readerPane = document.getElementById('reader-pane');
+            const composePane = document.getElementById('compose-pane');
+            const creatorPane = document.getElementById('creator-pane');
 
-                if (!age) return err.innerText = "Podaj swój wiek.";
-                if (enteredCatppa !== activeCatppaToken) {
-                    return err.innerText = "Błąd autoryzacji Catppa: Niepoprawny token weryfikacyjny unpackge.";
-                }
+            listPane.style.display = 'none';
+            readerPane.style.display = 'none';
+            composePane.style.display = 'none';
+            creatorPane.style.display = 'none';
 
-                netService.register(u, p, {
-                    age: age,
-                    accountType: selectedAccountType
-                }).then(() => {
-                    window.location.href = "index.html";
-                }).catch(e => err.innerText = "Rejestracja odrzucona: " + e.message);
+            if (folder === 'inbox' || folder === 'sent') {
+                listPane.style.display = 'flex';
+                readerPane.style.display = 'flex';
+                renderList(allEmails[folder]);
+            } else if (folder === 'compose') {
+                composePane.style.display = 'flex';
+            } else if (folder === 'creator') {
+                creatorPane.style.display = 'flex';
             }
         }
+
+        function sendEmail() {
+            let to = document.getElementById('email-to').value.trim().toLowerCase();
+            const subject = document.getElementById('email-subject').value.trim();
+            const body = document.getElementById('email-body').value.trim();
+            if (!to || !subject || !body) return alert("Wypełnij pola!");
+            if (!to.includes('@')) to += netService.suffix;
+
+            netService.db.collection('emails').add({
+                from: currentUser.fullAddress,
+                to: to,
+                subject: subject,
+                body: body,
+                read: false,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                alert("Wysłano pomyślnie!");
+                switchFolder('sent');
+            });
+        }
+
+        function showCtx(e, email) {
+            targetContextEmail = email;
+            const menu = document.getElementById('context-menu');
+            menu.style.display = 'block';
+            menu.style.left = e.pageX + 'px';
+            menu.style.top = e.pageY + 'px';
+        }
+        document.addEventListener('click', () => document.getElementById('context-menu').style.display = 'none');
+        function ctxToggleRead() { if (targetContextEmail) netService.db.collection('emails').doc(targetContextEmail.id).update({ read: !targetContextEmail.read }); }
+        function ctxDeleteEmail() { if (targetContextEmail && confirm("Usunąć?")) netService.db.collection('emails').doc(targetContextEmail.id).delete(); }
+        function toggleSelect(id, e) { e.stopPropagation(); selectedEmailIds.has(id) ? selectedEmailIds.delete(id) : selectedEmailIds.add(id); }
     </script>
 </body>
 </html>
