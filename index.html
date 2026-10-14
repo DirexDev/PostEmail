@@ -8,8 +8,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <!-- RetroNet Core Service -->
-    <script src="RetroNetService.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', 'Segoe UI', Arial, sans-serif; }
         body { background-color: #ffffff; color: #1f1f1f; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
@@ -24,7 +22,7 @@
         .logout-btn:hover { background: #fce8e6; }
 
         /* Główny obszar roboczy */
-        .main-workspace { display: flex; flex: 1; overflow: hidden; }
+        .main-workspace { display: flex; flex: 1; overflow: hidden; position: relative; }
 
         .sidebar { width: 260px; background: #f8f9fa; border-right: 1px solid #dadce0; padding: 20px 12px; display: flex; flex-direction: column; gap: 6px; justify-content: space-between; }
         .sidebar-top { display: flex; flex-direction: column; gap: 6px; }
@@ -91,23 +89,126 @@
         .google-btn-primary {
             background: #0b57d0; color: white; border: none; padding: 10px 24px;
             font-size: 14px; cursor: pointer; font-weight: 500; border-radius: 100px;
-            transition: background 0.2s; display: inline-flex; align-items: center; justify-content: center;
+            transition: background 0.2s; display: inline-flex; align-items: center; justify-content: center; width: 100%;
         }
         .google-btn-primary:hover { background: #0842a0; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
         .empty-state { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: #5e5e5e; font-size: 15px; gap: 12px; text-align: center; font-weight: 500; }
+
+        /* Nakładka okna logowania w stylu Google */
+        #auth-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95); display: flex; justify-content: center; align-items: center; z-index: 2000;
+        }
+        .google-auth-card {
+            background: #ffffff; width: 450px; border-radius: 28px;
+            border: 1px solid #dadce0; padding: 40px; display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08); position: relative;
+        }
+        .retronet-logo-svg { width: 70px; height: 70px; margin-bottom: 8px; filter: drop-shadow(0px 3px 5px rgba(0, 120, 215, 0.3)); }
+        .google-title { font-size: 24px; font-weight: 400; color: #1f1f1f; margin-bottom: 8px; text-align: center; }
+        .google-subtitle { font-size: 15px; color: #444746; margin-bottom: 30px; text-align: center; }
+        .google-input-container { width: 100%; margin-bottom: 20px; position: relative; }
+        .google-input-field { width: 100%; padding: 16px; border: 1px solid #747775; border-radius: 4px; font-size: 16px; outline: none; background: transparent; color: #1f1f1f; transition: border-color 0.2s; }
+        .google-input-field:focus { border-color: #0b57d0; border-width: 2px; padding: 15px; }
+
+        .input-with-domain { display: flex; align-items: center; border: 1px solid #747775; border-radius: 4px; overflow: hidden; background: #fff; width: 100%; transition: border-color 0.2s; }
+        .input-with-domain:focus-within { border-color: #0b57d0; border-width: 2px; }
+        .input-with-domain input { flex: 1; padding: 16px; border: none; font-size: 16px; outline: none; background: transparent; color: #1f1f1f; }
+        .input-domain-suffix { background: #f8f9fa; color: #444746; padding: 16px 14px; font-size: 15px; border-left: 1px solid #747775; font-weight: 500; }
+
+        .google-actions { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px; }
+        .google-btn-text { background: transparent; color: #0b57d0; border: none; font-size: 14px; font-weight: 500; cursor: pointer; padding: 10px; }
+        .google-btn-text:hover { background: rgba(11, 87, 208, 0.04); border-radius: 100px; }
+
+        .catppa-auth-box {
+            background: #f8f9fa; border: 1px solid #dadce0; border-radius: 12px; padding: 16px;
+            width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: center; margin-bottom: 20px;
+        }
+        .catppa-title { font-size: 13px; font-weight: 500; color: #444746; text-align: center; }
+        .catppa-code-display { font-size: 18px; font-weight: bold; color: #0b57d0; letter-spacing: 2px; background: #fff; padding: 8px 16px; border-radius: 6px; border: 1px dashed #0b57d0; }
+        #account-type-dropdown {
+            position: absolute; bottom: 70px; left: 40px; background: #ffffff; border: 1px solid #dadce0;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15); border-radius: 12px; width: 280px; z-index: 300; display: none; padding: 8px 0;
+        }
+        .dropdown-option { padding: 12px 20px; font-size: 14px; color: #1f1f1f; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        .dropdown-option:hover { background: #f8f9fa; color: #0b57d0; }
+        .error-msg { color: #b3261e; font-size: 13px; text-align: center; margin-top: 15px; font-weight: 500; }
     </style>
 </head>
 <body>
 
+    <!-- Wbudowany Panel Logowania / Rejestracji (Otwiera się automatycznie, gdy brak sesji) -->
+    <div id="auth-overlay" style="display: none;">
+        <div class="google-auth-card">
+            <!-- Logo RetroNet -->
+            <svg class="retronet-logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="aeroBlueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#33b5e5" />
+                        <stop offset="50%" stop-color="#0085cf" />
+                        <stop offset="100%" stop-color="#004385" />
+                    </linearGradient>
+                    <linearGradient id="aeroHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6" />
+                        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0" />
+                    </linearGradient>
+                </defs>
+                <path fill="url(#aeroBlueGrad)" stroke="#002d5a" stroke-width="1.5" d="M22,25 C15,18 35,8 45,18 C55,28 35,42 22,40 C18,39 16,33 25,32 C35,31 42,38 48,45 C55,53 62,62 70,72 C75,78 82,85 88,80 C93,76 85,70 80,65 C70,55 58,42 48,32 C58,30 68,22 65,12 C62,4 42,8 35,16 C28,24 25,22 22,25 Z"/>
+                <path fill="url(#aeroBlueGrad)" stroke="#002d5a" stroke-width="1.5" d="M28,15 C26,35 24,55 22,75 C21,83 29,85 32,80 C34,75 35,45 36,35 C42,35 55,38 62,48 C69,58 75,72 82,82 C85,86 92,80 88,75 C80,62 70,48 62,38 C54,28 42,22 28,15 Z"/>
+                <path fill="url(#aeroHighlight)" d="M29,17 C35,20 48,25 54,32 C42,33 34,26 29,17 Z"/>
+            </svg>
+
+            <div class="google-title" id="auth-main-title">Zaloguj się</div>
+            <div class="google-subtitle" id="auth-main-subtitle">do ekosystemu PostEmail</div>
+            
+            <div id="step-credentials" style="width: 100%;">
+                <div class="google-input-container">
+                    <div class="input-with-domain">
+                        <input type="text" id="auth-username-input" placeholder="Nazwa konta (np. karol)">
+                        <span class="input-domain-suffix">@retronet.call</span>
+                    </div>
+                </div>
+
+                <div class="google-input-container">
+                    <input type="password" id="auth-password-input" class="google-input-field" placeholder="Wprowadź hasło">
+                </div>
+
+                <div class="google-input-container" id="age-container" style="display: none;">
+                    <input type="number" id="auth-age-input" class="google-input-field" placeholder="Twój wiek (np. 14)">
+                </div>
+
+                <!-- Moduł Catppa (unpackge) -->
+                <div class="catppa-auth-box" id="catppa-container" style="display: none;">
+                    <div class="catppa-title">Weryfikacja Catppa (unpackge)</div>
+                    <div class="catppa-code-display" id="catppa-target-code">---</div>
+                    <input type="text" id="catppa-input" class="google-input-field" placeholder="Wpisz token Catppa" style="background: #fff; padding: 10px; text-align: center;">
+                </div>
+
+                <div class="google-actions">
+                    <div style="position: relative;">
+                        <button id="create-account-toggle" class="google-btn-text" onclick="toggleAccountMenu()">Utwórz konto</button>
+                        <div id="account-type-dropdown">
+                            <div class="dropdown-option" onclick="selectAccountType('personal')">Do użytku osobistego</div>
+                            <div class="dropdown-option" onclick="selectAccountType('child')">Dla dziecka</div>
+                            <div class="dropdown-option" onclick="selectAccountType('work')">Do pracy lub celów biznesowych</div>
+                        </div>
+                    </div>
+                    <button id="primary-action-btn" class="google-btn-primary" style="width: auto; padding: 10px 24px;" onclick="handleAuthAction()">Dalej</button>
+                </div>
+            </div>
+            <div id="auth-error" class="error-msg"></div>
+        </div>
+    </div>
+
+    <!-- Główny interfejs PostEmail -->
     <header>
         <div class="header-brand">
             <span>PostEmail</span> <span style="font-size: 13px; font-weight: normal; color: #5e5e5e;">(RetroNet Workspace)</span>
         </div>
         <div class="user-panel">
-            <!-- Wyświetlanie pełnego, prawdziwego adresu e-mail z końcówką @retronet.call -->
             <span class="user-badge-pill" id="current-user-email">Ładowanie adresu...</span>
-            <button class="logout-btn" onclick="netService.logout()">Wyloguj</button>
+            <button class="logout-btn" onclick="logoutUser()">Wyloguj</button>
         </div>
     </header>
 
@@ -168,8 +269,8 @@
                     <div><strong>Wiek:</strong> 14 lat (klasa 7)</div>
                     <div><strong>Szkoła:</strong> Szkoła Podstawowa nr 11 z Oddziałami Integracyjnymi im. Kornela Makuszyńskiego w Białymstoku (ul. Sienkiewicza)</div>
                     <div><strong>Rok utworzenia:</strong> 2026</div>
-                    <div><strong>Wersja usługi:</strong> PostEmail v4.0 (Full Email Sync)</div>
-                    <div><strong>System autoryzacji:</strong> RetroNet OS Auth v2.0</div>
+                    <div><strong>Wersja usługi:</strong> PostEmail v5.0 (All-In-One Unified Edition)</div>
+                    <div><strong>System autoryzacji:</strong> RetroNet OS Auth & Catppa v2.0</div>
                     <div style="margin-top: 10px; font-size: 13px; color: #5e5e5e; border-top: 1px solid #dadce0; padding-top: 12px; font-weight: 500;">
                         Wszystkie prawa autorskie do architektury ekosystemu RetroNet należą do twórcy.
                     </div>
@@ -179,7 +280,7 @@
             <div id="compose-pane" class="compose-pane">
                 <h3>Nowa wiadomość e-mail</h3>
                 <div class="compose-form">
-                    <div class="compose-field"><span>Do:</span><input type="text" id="email-to" placeholder="np. karol"></div>
+                    <div class="compose-field"><span>Do:</span><input type="text" id="email-to" placeholder="np. karol lub karol@retronet.call"></div>
                     <div class="compose-field"><span>Temat:</span><input type="text" id="email-subject" placeholder="Temat"></div>
                     <textarea class="compose-textarea" id="email-body" placeholder="Treść wiadomości..."></textarea>
                     <button class="google-btn-primary" style="width: auto; padding: 12px 30px;" onclick="sendEmail()">Wyślij wiadomość</button>
@@ -197,59 +298,138 @@
 
     <script>
         const apiConfig = {
-            urlfirebase: {
-                apiKey: "AIzaSyB7Q9TSXa4CQc2nSiUhS044wD463jBHpr0",
-                authDomain: "retronetcall.firebaseapp.com",
-                projectId: "retronetcall",
-                storageBucket: "retronetcall.firebasestorage.app",
-                messagingSenderId: "820407833858",
-                appId: "1:820407833858:web:e4e1cc71f364955b3bde1b"
-            }
+            apiKey: "AIzaSyB7Q9TSXa4CQc2nSiUhS044wD463jBHpr0",
+            authDomain: "retronetcall.firebaseapp.com",
+            projectId: "retronetcall",
+            storageBucket: "retronetcall.firebasestorage.app",
+            messagingSenderId: "820407833858",
+            appId: "1:820407833858:web:e4e1cc71f364955b3bde1b"
         };
 
-        let netService = null;
+        const SUFFIX = "@retronet.call";
+        let auth, db;
         let currentUser = null;
         let currentFolder = "inbox";
         let allEmails = { inbox: [], sent: [] };
         let selectedEmailIds = new Set();
         let targetContextEmail = null;
 
+        let isRegisterMode = false;
+        let selectedAccountType = "personal";
+        let activeCatppaToken = "";
+
         window.addEventListener('DOMContentLoaded', () => {
-            if (typeof RetroNetService === 'undefined') {
-                alert("Błąd: Brak pliku RetroNetService.js!");
+            if (!window.firebase) {
+                alert("Błąd: Brak biblioteki Firebase SDK.");
                 return;
             }
 
-            netService = RetroNetService.init(apiConfig.urlfirebase);
-
-            // Odczyt adresu e-mail z parametrów URL lub localStorage przekazanego z Auth.html
-            const urlParams = new URLSearchParams(window.location.search);
-            let paramEmail = urlParams.get('email');
-            if (!paramEmail) {
-                paramEmail = localStorage.getItem("retronet_active_user");
+            if (!firebase.apps.length) {
+                firebase.initializeApp(apiConfig);
             }
 
-            netService.onAuthReady((session) => {
-                if (session) {
-                    currentUser = session;
-                    document.getElementById('current-user-email').innerText = session.fullAddress;
-                    initListeners(session.fullAddress);
-                } else if (paramEmail) {
-                    const cleanEmail = paramEmail.trim().toLowerCase();
-                    currentUser = {
-                        fullAddress: cleanEmail,
-                        username: cleanEmail.split('@')[0]
-                    };
-                    document.getElementById('current-user-email').innerText = currentUser.fullAddress;
-                    initListeners(currentUser.fullAddress);
+            auth = firebase.auth();
+            db = firebase.firestore();
+            auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    const fullAddress = user.email;
+                    currentUser = { fullAddress: fullAddress, username: fullAddress.split('@')[0] };
+                    document.getElementById('current-user-email').innerText = fullAddress;
+                    document.getElementById('auth-overlay').style.display = 'none';
+                    initListeners(fullAddress);
                 } else {
-                    window.location.href = "Auth.html";
+                    document.getElementById('current-user-email').innerText = "Wymagane logowanie";
+                    document.getElementById('auth-overlay').style.display = 'flex';
                 }
             });
         });
 
+        function toggleAccountMenu() {
+            const dropdown = document.getElementById('account-type-dropdown');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#create-account-toggle') && !e.target.closest('#account-type-dropdown')) {
+                const dropdown = document.getElementById('account-type-dropdown');
+                if (dropdown) dropdown.style.display = 'none';
+            }
+        });
+
+        function selectAccountType(type) {
+            selectedAccountType = type;
+            const dropdown = document.getElementById('account-type-dropdown');
+            if (dropdown) dropdown.style.display = 'none';
+            isRegisterMode = true;
+
+            document.getElementById('auth-main-title').innerText = "Utwórz konto PostEmail";
+            document.getElementById('auth-main-subtitle').innerText = type === 'child' ? "Dla dziecka" : (type === 'work' ? "Do pracy lub celów biznesowych" : "Do użytku osobistego");
+            document.getElementById('create-account-toggle').style.display = 'none';
+            document.getElementById('primary-action-btn').innerText = "Zarejestruj konto";
+
+            document.getElementById('age-container').style.display = 'block';
+            document.getElementById('catppa-container').style.display = 'flex';
+
+            activeCatppaToken = "CATPPA-" + Math.floor(1000 + Math.random() * 9000);
+            const containerPayload = JSON.stringify({ catppaToken: activeCatppaToken, timestamp: Date.now() });
+            const packedContainer = btoa(containerPayload);
+            
+            // unpackge / Catppa extraction simulation
+            let unpacked = null;
+            try {
+                unpacked = JSON.parse(atob(packedContainer));
+            } catch(e) {}
+
+            document.getElementById('catppa-target-code').innerText = unpacked ? unpacked.catppaToken : activeCatppaToken;
+            document.getElementById('auth-error').innerText = "";
+        }
+
+        function handleAuthAction() {
+            const rawUser = document.getElementById('auth-username-input').value.trim().toLowerCase();
+            const p = document.getElementById('auth-password-input').value;
+            const err = document.getElementById('auth-error');
+            err.innerText = "";
+
+            if (!rawUser || !p) return err.innerText = "Wpisz nazwę konta oraz hasło.";
+            const fullEmail = rawUser.includes('@') ? rawUser : rawUser + SUFFIX;
+
+            if (!isRegisterMode) {
+                auth.signInWithEmailAndPassword(fullEmail, p).catch(e => {
+                    err.innerText = "Błąd logowania: " + e.message;
+                });
+            } else {
+                const age = document.getElementById('auth-age-input').value.trim();
+                const enteredCatppa = document.getElementById('catppa-input').value.trim();
+
+                if (!age) return err.innerText = "Podaj swój wiek.";
+                if (enteredCatppa !== activeCatppaToken) {
+                    return err.innerText = "Błąd autoryzacji Catppa: Niepoprawny token weryfikacyjny.";
+                }
+
+                auth.createUserWithEmailAndPassword(fullEmail, p).then((cred) => {
+                    return db.collection('users').doc(cred.user.uid).set({
+                        username: fullEmail.split('@')[0],
+                        age: age,
+                        accountType: selectedAccountType,
+                        registeredAt: new Date().toISOString()
+                    });
+                }).catch(e => {
+                    err.innerText = "Rejestracja odrzucona: " + e.message;
+                });
+            }
+        }
+
+        function logoutUser() {
+            auth.signOut().then(() => {
+                currentUser = null;
+                document.getElementById('auth-overlay').style.display = 'flex';
+            });
+        }
+
         function initListeners(address) {
-            netService.db.collection('emails').where('to', '==', address)
+            db.collection('emails').where('to', '==', address)
                 .onSnapshot(snap => {
                     allEmails.inbox = [];
                     snap.forEach(doc => allEmails.inbox.push({ id: doc.id, ...doc.data() }));
@@ -258,7 +438,7 @@
                     if (currentFolder === 'inbox') renderList(allEmails.inbox);
                 });
 
-            netService.db.collection('emails').where('from', '==', address)
+            db.collection('emails').where('from', '==', address)
                 .onSnapshot(snap => {
                     allEmails.sent = [];
                     snap.forEach(doc => allEmails.sent.push({ id: doc.id, ...doc.data() }));
@@ -298,7 +478,7 @@
             document.querySelectorAll('.mail-card').forEach(c => c.classList.remove('active'));
             el.classList.add('active');
             if (!email.read && currentFolder === 'inbox') {
-                netService.db.collection('emails').doc(email.id).update({ read: true });
+                db.collection('emails').doc(email.id).update({ read: true });
             }
             document.getElementById('reader-pane').innerHTML = `
                 <div class="reader-subject">${email.subject}</div>
@@ -335,13 +515,14 @@
         }
 
         function sendEmail() {
+            if (!currentUser) return alert("Musisz być zalogowany, aby wysyłać wiadomości.");
             let to = document.getElementById('email-to').value.trim().toLowerCase();
             const subject = document.getElementById('email-subject').value.trim();
             const body = document.getElementById('email-body').value.trim();
-            if (!to || !subject || !body) return alert("Wypełnij pola!");
-            if (!to.includes('@')) to += netService.suffix;
+            if (!to || !subject || !body) return alert("Wypełnij wszystkie pola wiadomości!");
+            if (!to.includes('@')) to += SUFFIX;
 
-            netService.db.collection('emails').add({
+            db.collection('emails').add({
                 from: currentUser.fullAddress,
                 to: to,
                 subject: subject,
@@ -349,8 +530,13 @@
                 read: false,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             }).then(() => {
-                alert("Wysłano pomyślnie!");
+                alert("Wiadomość została wysłana pomyślnie!");
+                document.getElementById('email-to').value = "";
+                document.getElementById('email-subject').value = "";
+                document.getElementById('email-body').value = "";
                 switchFolder('sent');
+            }).catch(err => {
+                alert("Błąd podczas wysyłania: " + err.message);
             });
         }
 
@@ -361,10 +547,51 @@
             menu.style.left = e.pageX + 'px';
             menu.style.top = e.pageY + 'px';
         }
-        document.addEventListener('click', () => document.getElementById('context-menu').style.display = 'none');
-        function ctxToggleRead() { if (targetContextEmail) netService.db.collection('emails').doc(targetContextEmail.id).update({ read: !targetContextEmail.read }); }
-        function ctxDeleteEmail() { if (targetContextEmail && confirm("Usunąć?")) netService.db.collection('emails').doc(targetContextEmail.id).delete(); }
-        function toggleSelect(id, e) { e.stopPropagation(); selectedEmailIds.has(id) ? selectedEmailIds.delete(id) : selectedEmailIds.add(id); }
+        document.addEventListener('click', () => {
+            const menu = document.getElementById('context-menu');
+            if (menu) menu.style.display = 'none';
+        });
+
+        function ctxToggleRead() { 
+            if (targetContextEmail) {
+                db.collection('emails').doc(targetContextEmail.id).update({ read: !targetContextEmail.read }); 
+            }
+        }
+
+        function ctxDeleteEmail() { 
+            if (targetContextEmail && confirm("Czy na pewno chcesz usunąć tę wiadomość?")) {
+                db.collection('emails').doc(targetContextEmail.id).delete(); 
+            }
+        }
+
+        function toggleSelect(id, e) { 
+            e.stopPropagation(); 
+            selectedEmailIds.has(id) ? selectedEmailIds.delete(id) : selectedEmailIds.add(id); 
+        }
+
+        function deleteSelectedEmails() {
+            if (selectedEmailIds.size === 0) return alert("Nie zaznaczono żadnych wiadomości.");
+            if (confirm(`Czy na pewno usunąć zaznaczone wiadomości (${selectedEmailIds.size})?`)) {
+                const batch = db.batch();
+                selectedEmailIds.forEach(id => {
+                    batch.delete(db.collection('emails').doc(id));
+                });
+                batch.commit().then(() => {
+                    selectedEmailIds.clear();
+                });
+            }
+        }
+
+        function markSelectedReadStatus(status) {
+            if (selectedEmailIds.size === 0) return alert("Nie zaznaczono żadnych wiadomości.");
+            const batch = db.batch();
+            selectedEmailIds.forEach(id => {
+                batch.update(db.collection('emails').doc(id), { read: status });
+            });
+            batch.commit().then(() => {
+                selectedEmailIds.clear();
+            });
+        }
     </script>
 </body>
 </html>
