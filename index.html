@@ -19,8 +19,11 @@
         .header-brand { font-weight: 500; font-size: 18px; color: #0b57d0; display: flex; align-items: center; gap: 8px; }
         
         .user-panel { display: flex; align-items: center; gap: 15px; font-size: 14px; }
-        .logout-btn { background: #f1f3f4; border: 1px solid #dadce0; color: #1f1f1f; padding: 8px 16px; cursor: pointer; font-weight: 500; border-radius: 100px; }
-        .logout-btn:hover { background: #e8eaed; }
+        .user-badge-pill { background: #c2e7ff; color: #001d35; padding: 6px 14px; border-radius: 100px; font-weight: 500; font-size: 13px; }
+        .nav-link-btn { background: transparent; border: 1px solid #dadce0; color: #1f1f1f; padding: 6px 14px; cursor: pointer; font-weight: 500; border-radius: 100px; text-decoration: none; font-size: 13px; }
+        .nav-link-btn:hover { background: #f1f3f4; }
+        .logout-btn { background: #f1f3f4; border: 1px solid #dadce0; color: #b3261e; padding: 6px 14px; cursor: pointer; font-weight: 500; border-radius: 100px; font-size: 13px; }
+        .logout-btn:hover { background: #fce8e6; }
 
         /* Główny obszar roboczy */
         .main-workspace { display: flex; flex: 1; overflow: hidden; }
@@ -104,7 +107,8 @@
             <span>PostEmail</span> <span style="font-size: 13px; font-weight: normal; color: #5e5e5e;">(RetroNet Workspace)</span>
         </div>
         <div class="user-panel">
-            <span id="current-user-display" style="font-weight: 500;">Sprawdzanie sesji...</span>
+            <span class="user-badge-pill" id="current-user-display">Ładowanie profilu...</span>
+            <a href="p2p.html" class="nav-link-btn">📹 P2P Calls</a>
             <button class="logout-btn" onclick="netService.logout()">Wyloguj</button>
         </div>
     </header>
@@ -151,7 +155,7 @@
                     </button>
                 </div>
                 <div class="mail-items-scroll" id="mail-items-container">
-                    <div style="padding: 25px; text-align: center; color: #5e5e5e; font-size: 13px;">Oczekiwanie na dane sesji...</div>
+                    <div style="padding: 25px; text-align: center; color: #5e5e5e; font-size: 13px;">Wczytywanie wiadomości...</div>
                 </div>
             </div>
 
@@ -166,7 +170,7 @@
                     <div><strong>Wiek:</strong> 14 lat (klasa 7)</div>
                     <div><strong>Szkoła:</strong> Szkoła Podstawowa nr 11 z Oddziałami Integracyjnymi im. Kornela Makuszyńskiego w Białymstoku (ul. Sienkiewicza)</div>
                     <div><strong>Rok utworzenia:</strong> 2026</div>
-                    <div><strong>Wersja usługi:</strong> PostEmail v3.6 (Multi-tab Safe Session)</div>
+                    <div><strong>Wersja usługi:</strong> PostEmail v3.7 (Session Display & Multi-Tab Safe)</div>
                     <div><strong>System autoryzacji:</strong> RetroNet OS Auth v2.0</div>
                     <div style="margin-top: 10px; font-size: 13px; color: #5e5e5e; border-top: 1px solid #dadce0; padding-top: 12px; font-weight: 500;">
                         Wszystkie prawa autorskie do architektury ekosystemu RetroNet należą do twórcy.
@@ -220,23 +224,14 @@
 
             netService = RetroNetService.init(apiConfig.urlfirebase);
 
-            // Ustawienie trwałego nasłuchiwania sesji bez nagłych przekierowań w tle
-            netService.auth.onAuthStateChanged((user) => {
-                if (user) {
-                    netService.onAuthReady((session) => {
-                        if (session) {
-                            currentUser = session;
-                            document.getElementById('current-user-display').innerText = session.fullAddress + " (ID: " + session.peerId + ")";
-                            initListeners(session.fullAddress);
-                        }
-                    });
+            netService.onAuthReady((session) => {
+                if (session) {
+                    currentUser = session;
+                    // Wyświetlenie pełnego adresu i nazwy P2P w górnym panelu
+                    document.getElementById('current-user-display').innerText = `${session.fullAddress} (P2P ID: ${session.peerId})`;
+                    initListeners(session.fullAddress);
                 } else {
-                    // Jeśli użytkownik nie jest zalogowany w tej karcie, daje czas na synchronizację lub przekierowuje dopiero przy braku sesji
-                    setTimeout(() => {
-                        if (!netService.auth.currentUser) {
-                            window.location.href = "Auth.html";
-                        }
-                    }, 1200);
+                    window.location.href = "Auth.html";
                 }
             });
         });
@@ -255,7 +250,7 @@
                 .onSnapshot(snap => {
                     allEmails.sent = [];
                     snap.forEach(doc => allEmails.sent.push({ id: doc.id, ...doc.data() }));
-                    allEmails.sent.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                    allEmails.sent.sort((a, b) => (b.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
                     if (currentFolder === 'sent') renderList(allEmails.sent);
                 });
         }
