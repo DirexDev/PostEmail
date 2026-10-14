@@ -1,96 +1,105 @@
 /**
- * RetroNetService.js - Centralny rdzeń usług i tożsamości ekosystemu RetroNet
+ * RetroNetService.js - Realny rdzeń procesów systemowych i autoryzacji ekosystemu RetroNet
+ * Stworzone przez: Karol Kopeć (14 lat, klasa 7)
+ * Szkoła Podstawowa nr 11 z Oddziałami Integracyjnymi im. Kornela Makuszyńskiego w Białymstoku (ul. Sienkiewicza)
+ * Rok utworzenia: 2026 | Fundament przyszłej struktury firmowej
  */
 (function (window) {
-    const firebaseConfig = {
-        apiKey: "AIzaSyB7Q9TSXa4CQc2nSiUhS044wD463jBHpr0",
-        authDomain: "retronetcall.firebaseapp.com",
-        projectId: "retronetcall",
-        storageBucket: "retronetcall.firebasestorage.app",
-        messagingSenderId: "820407833858",
-        appId: "1:820407833858:web:e4e1cc71f364955b3bde1b"
-    };
+    window.RetroNetService = {
+        init: function (firebaseConfig) {
+            if (!window.firebase) {
+                console.error("RetroNetService: Brak biblioteki Firebase SDK.");
+                return;
+            }
 
-    if (!window.firebase) {
-        console.error("RetroNetService: Brak załadowanego SDK Firebase!");
-        return;
-    }
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
 
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
+            const auth = firebase.auth();
+            const db = firebase.firestore();
+            auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+            const SUFFIX = "@retronet.call";
 
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-    
-    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-    const SUFFIX = "@retronet.call";
+            return {
+                auth: auth,
+                db: db,
+                suffix: SUFFIX,
 
-    window.RetroNet = {
-        auth: auth,
-        db: db,
-        suffix: SUFFIX,
-
-        onAuthReady: function (callback) {
-            auth.onAuthStateChanged((user) => {
-                if (user) {
-                    db.collection('users').doc(user.uid).get().then((doc) => {
-                        const userData = doc.exists ? doc.data() : { username: user.email.split('@')[0], peerId: "1001" };
-                        callback({
-                            user: user,
-                            username: userData.username,
-                            fullAddress: userData.username + SUFFIX,
-                            peerId: userData.peerId
-                        });
-                    }).catch(err => {
-                        console.error("RetroNetService: Błąd pobierania profilu z Firestore:", err);
-                        callback({
-                            user: user,
-                            username: user.email.split('@')[0],
-                            fullAddress: user.email,
-                            peerId: "1001"
-                        });
-                    });
-                } else {
-                    callback(null);
-                }
-            });
-        },
-
-        login: function (username, password) {
-            const cleanName = username.trim().toLowerCase();
-            const fullEmail = cleanName.includes('@') ? cleanName : cleanName + SUFFIX;
-            return auth.signInWithEmailAndPassword(fullEmail, password);
-        },
-
-        register: function (username, password) {
-            const cleanName = username.trim().toLowerCase();
-            const fullEmail = cleanName.includes('@') ? cleanName : cleanName + SUFFIX;
-
-            return db.collection('users').get().then((snapshot) => {
-                let maxId = 1000;
-                snapshot.forEach((doc) => {
-                    const id = parseInt(doc.data().peerId, 10);
-                    if (!isNaN(id) && id > maxId) {
-                        maxId = id;
+                // Metoda wykorzystująca bibliotekę unpackge do dekodowania i walidacji paczki rejestracyjnej
+                unpackRegistrationPackage: function (rawPackageData) {
+                    try {
+                        if (typeof unpackge !== 'undefined' && typeof unpackge.extract === 'function') {
+                            return unpackge.extract(rawPackageData);
+                        }
+                        // Fallback struktur binarnych / systemowych pod kątem przyszłej biblioteki firmowej
+                        return JSON.parse(atob(rawPackageData));
+                    } catch (err) {
+                        console.error("RetroNetService [unpackge]: Błąd rozpakowywania kontenera danych:", err);
+                        return null;
                     }
-                });
-                const nextId = (maxId + 1).toString();
+                },
 
-                return auth.createUserWithEmailAndPassword(fullEmail, password).then((cred) => {
-                    return db.collection('users').doc(cred.user.uid).set({
-                        username: cleanName.split('@')[0],
-                        peerId: nextId
+                onAuthReady: function (callback) {
+                    auth.onAuthStateChanged((user) => {
+                        if (user) {
+                            db.collection('users').doc(user.uid).get().then((doc) => {
+                                const userData = doc.exists ? doc.data() : { username: user.email.split('@')[0], peerId: "1001" };
+                                callback({
+                                    user: user,
+                                    username: userData.username,
+                                    fullAddress: userData.username + SUFFIX,
+                                    peerId: userData.peerId
+                                });
+                            }).catch(() => {
+                                callback({
+                                    user: user,
+                                    username: user.email.split('@')[0],
+                                    fullAddress: user.email,
+                                    peerId: "1001"
+                                });
+                            });
+                        } else {
+                            callback(null);
+                        }
                     });
-                });
-            });
-        },
+                },
 
-        logout: function () {
-            return auth.signOut().then(() => {
-                window.location.reload();
-            });
+                login: function (username, password) {
+                    const cleanName = username.trim().toLowerCase();
+                    const fullEmail = cleanName.includes('@') ? cleanName : cleanName + SUFFIX;
+                    return auth.signInWithEmailAndPassword(fullEmail, password);
+                },
+
+                register: function (username, password, extraData) {
+                    const cleanName = username.trim().toLowerCase();
+                    const fullEmail = cleanName.includes('@') ? cleanName : cleanName + SUFFIX;
+
+                    return db.collection('users').get().then((snapshot) => {
+                        let maxId = 1000;
+                        snapshot.forEach((doc) => {
+                            const id = parseInt(doc.data().peerId, 10);
+                            if (!isNaN(id) && id > maxId) maxId = id;
+                        });
+                        const nextId = (maxId + 1).toString();
+
+                        return auth.createUserWithEmailAndPassword(fullEmail, password).then((cred) => {
+                            return db.collection('users').doc(cred.user.uid).set({
+                                username: cleanName.split('@')[0],
+                                peerId: nextId,
+                                age: extraData.age,
+                                accountType: extraData.accountType,
+                                phone: extraData.phone,
+                                registeredAt: new Date().toISOString()
+                            });
+                        });
+                    });
+                },
+
+                logout: function () {
+                    return auth.signOut().then(() => window.location.reload());
+                }
+            };
         }
     };
-    console.log("RetroNetService załadowany pomyślnie.");
 })(window);
