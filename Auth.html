@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RetroNet ID - Logowanie i Rejestracja</title>
+    <title>RetroNet ID - Autoryzacja Catppa & unpackge</title>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
-    <!-- Serwisy RetroNet -->
+    <!-- Serwis RetroNet -->
     <script src="RetroNetService.js"></script>
-    <script src="sms.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', 'Segoe UI', Arial, sans-serif; }
         body { background-color: #ffffff; color: #1f1f1f; height: 100vh; display: flex; justify-content: center; align-items: center; }
@@ -31,11 +29,6 @@
         .google-input-field { width: 100%; padding: 16px; border: 1px solid #747775; border-radius: 4px; font-size: 16px; outline: none; background: transparent; color: #1f1f1f; transition: border-color 0.2s; }
         .google-input-field:focus { border-color: #0b57d0; border-width: 2px; padding: 15px; }
 
-        .input-with-domain { display: flex; align-items: center; border: 1px solid #747775; border-radius: 4px; overflow: hidden; background: #fff; width: 100%; }
-        .input-with-domain:focus-within { border-color: #0b57d0; border-width: 2px; }
-        .input-with-domain input { flex: 1; padding: 16px; border: none; font-size: 16px; outline: none; background: transparent; }
-        .input-domain-suffix { background: #f8f9fa; color: #444746; padding: 16px 12px; font-size: 15px; border-left: 1px solid #747775; font-weight: 500; }
-
         .google-actions { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px; }
         
         .google-btn-primary {
@@ -47,6 +40,13 @@
 
         .google-btn-text { background: transparent; color: #0b57d0; border: none; font-size: 14px; font-weight: 500; cursor: pointer; padding: 10px; }
         .google-btn-text:hover { background: rgba(11, 87, 208, 0.04); border-radius: 100px; }
+
+        .catppa-auth-box {
+            background: #f8f9fa; border: 1px solid #dadce0; border-radius: 12px; padding: 16px;
+            width: 100%; display: flex; flex-direction: column; gap: 8px; align-items: center; margin-bottom: 20px;
+        }
+        .catppa-title { font-size: 13px; font-weight: 500; color: #444746; text-align: center; }
+        .catppa-code-display { font-size: 18px; font-weight: bold; color: #0b57d0; letter-spacing: 2px; background: #fff; padding: 8px 16px; border-radius: 6px; border: 1px dashed #0b57d0; }
 
         #account-type-dropdown {
             position: absolute; bottom: 70px; left: 40px; background: #ffffff; border: 1px solid #dadce0;
@@ -61,6 +61,7 @@
 <body>
 
     <div class="google-auth-card">
+        <!-- Kaligraficzna litera R z błękitnym wykończeniem Aero-Blue -->
         <svg class="retronet-logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <linearGradient id="aeroBlueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -79,14 +80,11 @@
         </svg>
 
         <div class="google-title" id="auth-main-title">Zaloguj się</div>
-        <div class="google-subtitle" id="auth-main-subtitle">do konta RetroNet ID</div>
+        <div class="google-subtitle" id="auth-main-subtitle">do ekosystemu RetroNet-Call</div>
         
         <div id="step-credentials" style="width: 100%;">
             <div class="google-input-container">
-                <div class="input-with-domain">
-                    <input type="text" id="username-input" placeholder="Nazwa konta lub e-mail">
-                    <span class="input-domain-suffix">@retronet.call</span>
-                </div>
+                <input type="text" id="username-input" class="google-input-field" placeholder="Nazwa konta (np. karol)">
             </div>
 
             <div class="google-input-container" id="password-container">
@@ -97,8 +95,11 @@
                 <input type="number" id="age-input" class="google-input-field" placeholder="Twój wiek (np. 14)">
             </div>
 
-            <div class="google-input-container" id="phone-container" style="display: none;">
-                <input type="text" id="phone-input" class="google-input-field" placeholder="Numer telefonu (np. +48...)">
+            <!-- Autoryzacja Catppa (unpackge) -->
+            <div class="catppa-auth-box" id="catppa-container" style="display: none;">
+                <div class="catppa-title">Weryfikacja Catppa (unpackge)</div>
+                <div class="catppa-code-display" id="catppa-target-code">---</div>
+                <input type="text" id="catppa-input" class="google-input-field" placeholder="Wpisz token Catppa" style="background: #fff; padding: 10px; text-align: center;">
             </div>
 
             <div class="google-actions">
@@ -112,14 +113,6 @@
                 </div>
                 <button id="primary-action-btn" class="google-btn-primary" onclick="handleAuthAction()">Dalej</button>
             </div>
-        </div>
-
-        <div id="step-verify" style="display: none; flex-direction: column; gap: 16px; width: 100%;">
-            <p style="font-size: 14px; color: #444746; line-height: 1.5; text-align: center;" id="verify-info-text">Wprowadź kod weryfikacyjny wysłany przez bramkę.</p>
-            <div class="google-input-container">
-                <input type="text" id="sms-code-input" class="google-input-field" placeholder="Wprowadź 6-cyfrowy kod" maxlength="6">
-            </div>
-            <button class="google-btn-primary" style="width: 100%; padding: 12px;" onclick="verifySmsAndComplete()">Potwierdź kod</button>
         </div>
 
         <div id="auth-error" class="error-msg"></div>
@@ -140,12 +133,11 @@
         let netService = null;
         let isRegisterMode = false;
         let selectedAccountType = "personal";
-        let pendingRegistrationData = null;
-        let activeSmsToken = "";
+        let activeCatppaToken = "";
 
         window.addEventListener('DOMContentLoaded', () => {
-            if (typeof RetroNetService === 'undefined' || typeof RetroNetSMS === 'undefined') {
-                alert("Błąd: Brak bibliotek RetroNetService.js lub sms.js!");
+            if (typeof RetroNetService === 'undefined') {
+                alert("Błąd: Brak pliku RetroNetService.js!");
                 return;
             }
             netService = RetroNetService.init(apiConfig.urlfirebase);
@@ -171,23 +163,31 @@
             document.getElementById('account-type-dropdown').style.display = 'none';
             isRegisterMode = true;
 
-            document.getElementById('auth-main-title').innerText = "Utwórz konto RetroNet";
-            document.getElementById('auth-main-subtitle').innerText = type === 'child' ? "Dla dziecka" : (type === 'work' ? "Do pracy lub celów biznesowych" : "Do użytku osobistego");
+            document.getElementById('auth-main-title').innerText = "Utwórz konto RetroNet-Call";
+            document.getElementById('auth-main-subtitle').innerText = type === 'child' ? "Dla dziecka" : (type === 'work' ? " Do pracy lub celów biznesowych" : "Do użytku osobistego");
             document.getElementById('create-account-toggle').style.display = 'none';
-            document.getElementById('primary-action-btn').innerText = "Dalej (SMS Gateway)";
+            document.getElementById('primary-action-btn').innerText = "Zarejestruj konto";
 
             document.getElementById('age-container').style.display = 'block';
-            document.getElementById('phone-container').style.display = 'block';
+            document.getElementById('catppa-container').style.display = 'flex';
+
+            // Generowanie i ekstrakcja tokena Catppa przez unpackge
+            activeCatppaToken = "CATPPA-" + Math.floor(1000 + Math.random() * 9000);
+            const containerPayload = JSON.stringify({ catppaToken: activeCatppaToken, timestamp: Date.now() });
+            const packedContainer = btoa(containerPayload);
+            const unpackedCatppa = netService.unpackRegistrationPackage(packedContainer);
+
+            document.getElementById('catppa-target-code').innerText = unpackedCatppa ? unpackedCatppa.catppaToken : activeCatppaToken;
             document.getElementById('auth-error').innerText = "";
         }
 
-        async function handleAuthAction() {
-            const u = document.getElementById('username-input').value.trim();
+        function handleAuthAction() {
+            const u = document.getElementById('username-input').value.trim().toLowerCase();
             const p = document.getElementById('password-input').value;
             const err = document.getElementById('auth-error');
             err.innerText = "";
 
-            if (!u || !p) return err.innerText = "Wpisz nazwę użytkownika oraz hasło.";
+            if (!u || !p) return err.innerText = "Wpisz nazwę konta oraz hasło.";
 
             if (!isRegisterMode) {
                 netService.login(u, p).then(() => {
@@ -195,55 +195,20 @@
                 }).catch(e => err.innerText = "Błąd logowania: " + e.message);
             } else {
                 const age = document.getElementById('age-input').value.trim();
-                const phone = document.getElementById('phone-input').value.trim();
+                const enteredCatppa = document.getElementById('catppa-input').value.trim();
 
-                if (!age || !phone) return err.innerText = "Podaj wiek oraz numer telefonu.";
-
-                const payload = JSON.stringify({ username: u, password: p, age, phone, accountType: selectedAccountType, timestamp: Date.now() });
-                const packedContainer = btoa(payload);
-
-                const unpackedObj = netService.unpackRegistrationPackage(packedContainer);
-                if (!unpackedObj) {
-                    return err.innerText = "Błąd kontenera unpackge: Nie udało się spakować kontenera.";
+                if (!age) return err.innerText = "Podaj swój wiek.";
+                if (enteredCatppa !== activeCatppaToken) {
+                    return err.innerText = "Błąd autoryzacji Catppa: Niepoprawny token weryfikacyjny unpackge.";
                 }
 
-                pendingRegistrationData = unpackedObj;
-                activeSmsToken = RetroNetSMS.generateToken();
-
-                try {
-                    // Próba wysyłki przez bramkę SMS
-                    await RetroNetSMS.sendSms(phone, activeSmsToken);
-                    document.getElementById('step-credentials').style.display = 'none';
-                    document.getElementById('step-verify').style.display = 'flex';
-                } catch (e) {
-                    // Bezpieczny fallback dla środowiska testowego GitHub Pages / lokalnego
-                    console.warn("Bramka chmurowa niedostępna w trybie statycznym. Kod testowy:", activeSmsToken);
-                    document.getElementById('verify-info-text').innerHTML = `Bramka SMS (Tryb testowy): Twój kod to <strong style="color:#0b57d0; font-size:16px;">${activeSmsToken}</strong>`;
-                    document.getElementById('step-credentials').style.display = 'none';
-                    document.getElementById('step-verify').style.display = 'flex';
-                }
+                netService.register(u, p, {
+                    age: age,
+                    accountType: selectedAccountType
+                }).then(() => {
+                    window.location.href = "index.html";
+                }).catch(e => err.innerText = "Rejestracja odrzucona: " + e.message);
             }
-        }
-
-        function verifySmsAndComplete() {
-            const enteredCode = document.getElementById('sms-code-input').value.trim();
-            const err = document.getElementById('auth-error');
-
-            if (enteredCode !== activeSmsToken) {
-                return alert("Wprowadzony kod weryfikacyjny jest niepoprawny!");
-            }
-
-            netService.register(pendingRegistrationData.username, pendingRegistrationData.password, {
-                age: pendingRegistrationData.age,
-                accountType: pendingRegistrationData.accountType,
-                phone: pendingRegistrationData.phone
-            }).then(() => {
-                window.location.href = "index.html";
-            }).catch(e => {
-                err.innerText = "Rejestracja odrzucona: " + e.message;
-                document.getElementById('step-verify').style.display = 'none';
-                document.getElementById('step-credentials').style.display = 'flex';
-            });
         }
     </script>
 </body>
