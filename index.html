@@ -104,7 +104,7 @@
             <span>PostEmail</span> <span style="font-size: 13px; font-weight: normal; color: #5e5e5e;">(RetroNet Workspace)</span>
         </div>
         <div class="user-panel">
-            <span id="current-user-display" style="font-weight: 500;">Zalogowany</span>
+            <span id="current-user-display" style="font-weight: 500;">Sprawdzanie sesji...</span>
             <button class="logout-btn" onclick="netService.logout()">Wyloguj</button>
         </div>
     </header>
@@ -151,7 +151,7 @@
                     </button>
                 </div>
                 <div class="mail-items-scroll" id="mail-items-container">
-                    <div style="padding: 25px; text-align: center; color: #5e5e5e; font-size: 13px;">Wczytywanie...</div>
+                    <div style="padding: 25px; text-align: center; color: #5e5e5e; font-size: 13px;">Oczekiwanie na dane sesji...</div>
                 </div>
             </div>
 
@@ -166,7 +166,7 @@
                     <div><strong>Wiek:</strong> 14 lat (klasa 7)</div>
                     <div><strong>Szkoła:</strong> Szkoła Podstawowa nr 11 z Oddziałami Integracyjnymi im. Kornela Makuszyńskiego w Białymstoku (ul. Sienkiewicza)</div>
                     <div><strong>Rok utworzenia:</strong> 2026</div>
-                    <div><strong>Wersja usługi:</strong> PostEmail v3.5 (Google & RetroNet Workspace)</div>
+                    <div><strong>Wersja usługi:</strong> PostEmail v3.6 (Multi-tab Safe Session)</div>
                     <div><strong>System autoryzacji:</strong> RetroNet OS Auth v2.0</div>
                     <div style="margin-top: 10px; font-size: 13px; color: #5e5e5e; border-top: 1px solid #dadce0; padding-top: 12px; font-weight: 500;">
                         Wszystkie prawa autorskie do architektury ekosystemu RetroNet należą do twórcy.
@@ -220,13 +220,23 @@
 
             netService = RetroNetService.init(apiConfig.urlfirebase);
 
-            netService.onAuthReady((session) => {
-                if (session) {
-                    currentUser = session;
-                    document.getElementById('current-user-display').innerText = session.fullAddress;
-                    initListeners(session.fullAddress);
+            // Ustawienie trwałego nasłuchiwania sesji bez nagłych przekierowań w tle
+            netService.auth.onAuthStateChanged((user) => {
+                if (user) {
+                    netService.onAuthReady((session) => {
+                        if (session) {
+                            currentUser = session;
+                            document.getElementById('current-user-display').innerText = session.fullAddress + " (ID: " + session.peerId + ")";
+                            initListeners(session.fullAddress);
+                        }
+                    });
                 } else {
-                    window.location.href = "Auth.html";
+                    // Jeśli użytkownik nie jest zalogowany w tej karcie, daje czas na synchronizację lub przekierowuje dopiero przy braku sesji
+                    setTimeout(() => {
+                        if (!netService.auth.currentUser) {
+                            window.location.href = "Auth.html";
+                        }
+                    }, 1200);
                 }
             });
         });
@@ -245,7 +255,7 @@
                 .onSnapshot(snap => {
                     allEmails.sent = [];
                     snap.forEach(doc => allEmails.sent.push({ id: doc.id, ...doc.data() }));
-                    allEmails.sent.sort((a, b) => (b.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+                    allEmails.sent.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
                     if (currentFolder === 'sent') renderList(allEmails.sent);
                 });
         }
