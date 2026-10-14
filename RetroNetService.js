@@ -2,7 +2,6 @@
  * RetroNetService.js - Centralny rdzeń usług i tożsamości ekosystemu RetroNet
  */
 (function (window) {
-    // Konfiguracja bazy danych Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyB7Q9TSXa4CQc2nSiUhS044wD463jBHpr0",
         authDomain: "retronetcall.firebaseapp.com",
@@ -12,7 +11,11 @@
         appId: "1:820407833858:web:e4e1cc71f364955b3bde1b"
     };
 
-    // Inicjalizacja Firebase, jeśli jeszcze nie nastąpiła
+    if (!window.firebase) {
+        console.error("RetroNetService: Brak załadowanego SDK Firebase!");
+        return;
+    }
+
     if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
     }
@@ -20,18 +23,14 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
     
-    // Ustawienie stałej trwałości sesji w przeglądarce
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
     const SUFFIX = "@retronet.call";
 
-    // Globalny obiekt systemowy RetroNet dostępny dla wszystkich aplikacji w rodzinie
     window.RetroNet = {
         auth: auth,
         db: db,
         suffix: SUFFIX,
 
-        // Nasłuchiwanie stanu autoryzacji użytkownika
         onAuthReady: function (callback) {
             auth.onAuthStateChanged((user) => {
                 if (user) {
@@ -44,8 +43,13 @@
                             peerId: userData.peerId
                         });
                     }).catch(err => {
-                        console.error("RetroNetService: Błąd pobierania profilu użytkownika:", err);
-                        callback(null);
+                        console.error("RetroNetService: Błąd pobierania profilu z Firestore:", err);
+                        callback({
+                            user: user,
+                            username: user.email.split('@')[0],
+                            fullAddress: user.email,
+                            peerId: "1001"
+                        });
                     });
                 } else {
                     callback(null);
@@ -53,14 +57,12 @@
             });
         },
 
-        // Logowanie do sieci RetroNet
         login: function (username, password) {
             const cleanName = username.trim().toLowerCase();
             const fullEmail = cleanName.includes('@') ? cleanName : cleanName + SUFFIX;
             return auth.signInWithEmailAndPassword(fullEmail, password);
         },
 
-        // Rejestracja nowego konta z automatycznym, sekwencyjnym przydzielaniem ID (1001, 1002...)
         register: function (username, password) {
             const cleanName = username.trim().toLowerCase();
             const fullEmail = cleanName.includes('@') ? cleanName : cleanName + SUFFIX;
@@ -84,11 +86,11 @@
             });
         },
 
-        // Wylogowanie z sieci
         logout: function () {
             return auth.signOut().then(() => {
                 window.location.reload();
             });
         }
     };
+    console.log("RetroNetService załadowany pomyślnie.");
 })(window);
