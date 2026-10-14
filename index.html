@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PostEmail - RetroNet Mail Suite</title>
-    <!-- Zewnętrzne SDK Firebase (wymagane przez RetroNetService) -->
+    <!-- Zewnętrzne SDK Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -14,7 +14,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #f4f6f9; color: #333333; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-        /* Ekran logowania / autoryzacji RetroNet ID */
         #auth-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(135deg, #005a9e, #0078d4); display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -46,7 +45,6 @@
 
         .error-msg { color: #a80000; font-size: 12px; margin-top: 10px; text-align: center; width: 100%; }
 
-        /* Główny interfejs aplikacji */
         #app-screen { display: none; height: 100%; flex-direction: column; background: #f4f6f9; }
         
         header { background: #005a9e; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
@@ -141,7 +139,6 @@
 </head>
 <body>
 
-    <!-- Ekran logowania RetroNet ID -->
     <div id="auth-screen">
         <div class="net-auth-card">
             <svg class="auth-logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -183,7 +180,6 @@
         </div>
     </div>
 
-    <!-- Główny Interfejs Aplikacji -->
     <div id="app-screen">
         <header>
             <div class="header-brand">
@@ -281,7 +277,6 @@
         </div>
     </div>
 
-    <!-- Menu Kontekstowe HTML -->
     <div id="context-menu">
         <div class="context-menu-item" onclick="ctxToggleRead()">
             <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
@@ -302,21 +297,32 @@
         let selectedEmailIds = new Set();
         let targetContextEmail = null;
 
-        // Inicjalizacja przez systemową usługę RetroNet
-        RetroNet.onAuthReady((session) => {
-            if (session) {
-                currentUser = session;
-                document.getElementById('auth-screen').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('auth-screen').style.display = 'none';
-                    document.getElementById('app-screen').style.display = 'flex';
-                    document.getElementById('current-user-display').innerText = session.fullAddress;
-                    initRealtimeListeners(session.fullAddress);
-                }, 400);
-            } else {
-                document.getElementById('auth-screen').style.display = 'flex';
-                document.getElementById('app-screen').style.display = 'none';
+        // Sprawdzamy czy RetroNetService jest załadowany, a następnie inicjalizujemy
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof RetroNet === 'undefined') {
+                console.error("Błąd krytyczny: Obiekt RetroNet nie jest dostępny. Sprawdź czy plik RetroNetService.js znajduje się w tym samym folderze.");
+                const errDiv = document.getElementById('auth-error');
+                if(errDiv) errDiv.innerText = "Błąd systemu: Brak pliku RetroNetService.js";
+                return;
             }
+
+            RetroNet.onAuthReady((session) => {
+                if (session) {
+                    currentUser = session;
+                    const authScreen = document.getElementById('auth-screen');
+                    const appScreen = document.getElementById('app-screen');
+                    if(authScreen) authScreen.style.display = 'none';
+                    if(appScreen) appScreen.style.display = 'flex';
+                    const userDisplay = document.getElementById('current-user-display');
+                    if(userDisplay) userDisplay.innerText = session.fullAddress;
+                    initRealtimeListeners(session.fullAddress);
+                } else {
+                    const authScreen = document.getElementById('auth-screen');
+                    const appScreen = document.getElementById('app-screen');
+                    if(authScreen) authScreen.style.display = 'flex';
+                    if(appScreen) appScreen.style.display = 'none';
+                }
+            });
         });
 
         function toggleAuthMode() {
@@ -339,9 +345,15 @@
             }
 
             if (isRegisterMode) {
-                RetroNet.register(u, p).catch(e => err.innerText = e.message);
+                RetroNet.register(u, p).catch(e => {
+                    console.error("Błąd rejestracji:", e);
+                    err.innerText = "Rejestracja nie powiodła się: " + e.message;
+                });
             } else {
-                RetroNet.login(u, p).catch(e => err.innerText = e.message);
+                RetroNet.login(u, p).catch(e => {
+                    console.error("Błąd logowania:", e);
+                    err.innerText = "Błąd logowania: " + e.message;
+                });
             }
         }
 
@@ -380,7 +392,7 @@
                     const badge = document.getElementById('inbox-badge');
                     if (badge) badge.innerText = allEmails.inbox.filter(e => !e.read).length;
                     if (currentFolder === 'inbox') renderEmailList(allEmails.inbox);
-                });
+                }, (error) => console.error("Błąd pobierania skrzynki odbiorczej:", error));
 
             RetroNet.db.collection('emails').where('from', '==', myAddress)
                 .onSnapshot((snapshot) => {
@@ -388,7 +400,7 @@
                     snapshot.forEach(doc => allEmails.sent.push({ id: doc.id, ...doc.data() }));
                     allEmails.sent.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
                     if (currentFolder === 'sent') renderEmailList(allEmails.sent);
-                });
+                }, (error) => console.error("Błąd pobierania wysłanych:", error));
         }
 
         function renderEmailList(emails) {
@@ -453,7 +465,6 @@
             `;
         }
 
-        // Menu kontekstowe (prawy przycisk)
         function showContextMenu(e, email) {
             targetContextEmail = email;
             const menu = document.getElementById('context-menu');
@@ -465,7 +476,8 @@
         }
 
         document.addEventListener('click', () => {
-            document.getElementById('context-menu').style.display = 'none';
+            const menu = document.getElementById('context-menu');
+            if(menu) menu.style.display = 'none';
         });
 
         function ctxToggleRead() {
@@ -480,7 +492,6 @@
             }
         }
 
-        // Selekcja grupowa i akcje masowe
         function toggleSelectEmail(id, event) {
             event.stopPropagation();
             if (selectedEmailIds.has(id)) {
