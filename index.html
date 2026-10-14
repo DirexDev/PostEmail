@@ -3,278 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PostEmail - RetroNet OS Suite</title>
+    <title>PostEmail - RetroNet Workspace</title>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <!-- Biblioteka rozpakowująca kontenerów systemowych (unpackge) -->
-    <!-- <script src="unpackge.js"></script> -->
-    <!-- Zewnętrzny procesor RetroNet Service -->
+    <!-- RetroNet Core Service -->
     <script src="RetroNetService.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-        body { background-color: #121212; color: #e0e0e0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', 'Segoe UI', Arial, sans-serif; }
+        body { background-color: #ffffff; color: #1f1f1f; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-        /* Systemowe okno logowania/rejestracji */
-        #auth-screen {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(135deg, #0b192c, #1e3e62); display: flex; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 200;
-        }
-        .os-window {
-            background: #ffffff; color: #202020; width: 480px; border-radius: 8px;
-            box-shadow: 0 24px 48px rgba(0,0,0,0.5); border: 1px solid #d1d1d1; display: flex; flex-direction: column; overflow: hidden;
-            animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .os-window-header { background: #f3f3f3; padding: 12px 20px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
-        .os-window-title { font-weight: 600; font-size: 14px; color: #333; display: flex; align-items: center; gap: 8px; }
-        .os-window-body { padding: 30px; display: flex; flex-direction: column; gap: 16px; }
-
-        .input-group { width: 100%; }
-        .input-group label { display: block; font-size: 11px; font-weight: 700; margin-bottom: 6px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
-        .input-wrapper { position: relative; display: flex; align-items: center; border: 1px solid #8c8c8c; border-radius: 4px; overflow: hidden; background: #fff; width: 100%; }
-        .input-wrapper:focus-within { border-color: #0067c0; box-shadow: 0 0 0 2px rgba(0,103,192,0.2); }
-        .net-input { width: 100%; padding: 10px 12px; border: none; color: #202020; font-size: 14px; outline: none; }
-        .domain-tag { background: #e5e5e5; color: #444; padding: 10px 12px; font-size: 13px; white-space: nowrap; border-left: 1px solid #8c8c8c; font-weight: 600; }
-
-        .os-select { width: 100%; padding: 10px 12px; border: 1px solid #8c8c8c; border-radius: 4px; font-size: 14px; outline: none; background: #fff; color: #202020; }
+        /* Górny pasek w stylu Google / Gmail */
+        header { background: #ffffff; color: #1f1f1f; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dadce0; }
+        .header-brand { font-weight: 500; font-size: 18px; color: #0b57d0; display: flex; align-items: center; gap: 8px; }
         
-        .os-btn {
-            background: #0067c0; color: white; border: none; padding: 11px 20px;
-            font-size: 14px; cursor: pointer; width: 100%; font-weight: 600; border-radius: 4px;
-            transition: background 0.2s;
-        }
-        .os-btn:hover { background: #005a9e; }
-        .os-btn.secondary { background: transparent; color: #0067c0; border: 1px solid #0067c0; }
-        .os-btn.secondary:hover { background: rgba(0,103,192,0.05); }
+        .user-panel { display: flex; align-items: center; gap: 15px; font-size: 14px; }
+        .logout-btn { background: #f1f3f4; border: 1px solid #dadce0; color: #1f1f1f; padding: 8px 16px; cursor: pointer; font-weight: 500; border-radius: 100px; }
+        .logout-btn:hover { background: #e8eaed; }
 
-        .error-msg { color: #d83b01; font-size: 12px; text-align: center; }
-
-        /* Główny interfejs aplikacji */
-        #app-screen { display: none; height: 100%; flex-direction: column; background: #1e1e1e; }
-        
-        header { background: #2d2d2d; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #3f3f3f; }
-        .header-brand { font-weight: 600; font-size: 16px; color: #4ec9b0; }
-        
-        .user-panel { display: flex; align-items: center; gap: 15px; font-size: 13px; }
-        .logout-btn { background: #3c3c3c; border: 1px solid #555; color: #f1f1f1; padding: 5px 12px; border-radius: 4px; cursor: pointer; }
-        .logout-btn:hover { background: #c42b1c; border-color: c42b1c; }
-
+        /* Główny obszar roboczy */
         .main-workspace { display: flex; flex: 1; overflow: hidden; }
 
-        .sidebar { width: 260px; background: #252526; border-right: 1px solid #3f3f3f; padding: 15px 10px; display: flex; flex-direction: column; gap: 4px; justify-content: space-between; }
-        .sidebar-top { display: flex; flex-direction: column; gap: 4px; }
+        .sidebar { width: 260px; background: #f8f9fa; border-right: 1px solid #dadce0; padding: 20px 12px; display: flex; flex-direction: column; gap: 6px; justify-content: space-between; }
+        .sidebar-top { display: flex; flex-direction: column; gap: 6px; }
 
         .compose-main-btn {
-            background: #007acc; color: white; border: none; padding: 10px 16px; border-radius: 4px;
-            font-size: 13px; font-weight: 600; width: 100%; cursor: pointer; margin-bottom: 10px;
+            background: #c2e7ff; color: #001d35; border: none; padding: 14px 20px; 
+            font-size: 14px; font-weight: 500; width: 100%; cursor: pointer; margin-bottom: 12px; border-radius: 16px; text-align: left;
+            display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
-        .compose-main-btn:hover { background: #0098ff; }
+        .compose-main-btn:hover { background: #b3dffc; }
+        .compose-icon-svg { width: 18px; height: 18px; fill: #001d35; }
 
         .nav-item {
-            background: transparent; color: #cccccc; border: none; padding: 10px 12px; font-size: 13px; text-align: left;
-            cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: space-between;
+            background: transparent; color: #444746; border: none; padding: 12px 16px; font-size: 14px; text-align: left;
+            cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-weight: 500; border-radius: 0 100px 100px 0; margin-right: 10px;
         }
-        .nav-item:hover { background: #2a2d2e; color: #fff; }
-        .nav-item.active { background: #37373d; color: #ffffff; font-weight: 600; }
-        .badge { background: #007acc; color: white; padding: 2px 6px; font-size: 11px; border-radius: 10px; }
+        .nav-item:hover { background: #eef2f5; color: #1f1f1f; }
+        .nav-item.active { background: #d3e3fd; color: #041e49; font-weight: 600; }
+        .nav-label-group { display: flex; align-items: center; gap: 12px; }
+        .nav-icon { width: 18px; height: 18px; fill: #444746; }
+        .nav-item.active .nav-icon { fill: #041e49; }
+        .badge { background: #0b57d0; color: white; padding: 2px 8px; font-size: 12px; font-weight: bold; border-radius: 100px; }
 
-        .content-workspace { flex: 1; display: flex; background: #1e1e1e; overflow: hidden; }
-        .mail-list-pane { width: 380px; border-right: 1px solid #3f3f3f; display: flex; flex-direction: column; background: #252526; }
-        .list-action-bar { padding: 10px 14px; border-bottom: 1px solid #3f3f3f; background: #2d2d2d; display: flex; align-items: center; gap: 12px; }
-        .action-icon-btn { background: transparent; border: none; cursor: pointer; padding: 4px; color: #ccc; }
-        .action-icon-btn:hover { color: #fff; }
+        .content-workspace { flex: 1; display: flex; background: #ffffff; overflow: hidden; }
+        .mail-list-pane { width: 380px; border-right: 1px solid #dadce0; display: flex; flex-direction: column; background: #ffffff; }
+        .list-action-bar { padding: 12px 16px; border-bottom: 1px solid #dadce0; background: #ffffff; display: flex; align-items: center; gap: 12px; }
+        .action-icon-btn { background: #f1f3f4; border: 1px solid #dadce0; cursor: pointer; padding: 6px 12px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #1f1f1f; border-radius: 6px; }
+        .action-icon-btn:hover { background: #e8eaed; }
+        .action-icon-svg { width: 14px; height: 14px; fill: #1f1f1f; }
 
         .mail-items-scroll { flex: 1; overflow-y: auto; }
         .mail-card {
-            padding: 12px 14px; border-bottom: 1px solid #333; cursor: pointer; background: #252526;
-            transition: background 0.15s; display: flex; align-items: flex-start; gap: 12px;
+            padding: 14px 16px; border-bottom: 1px solid #dadce0; cursor: pointer; background: #ffffff;
+            transition: background 0.1s; display: flex; align-items: flex-start; gap: 12px;
         }
-        .mail-card:hover { background: #2a2d2e; }
-        .mail-card.active { background: #37373d; border-left: 3px solid #007acc; }
-        .mail-card.unread .mail-card-subject, .mail-card.unread .mail-card-sender { font-weight: 700; color: #fff; }
+        .mail-card:hover { background: #f8f9fa; }
+        .mail-card.active { background: #d3e3fd; }
+        .mail-card.unread .mail-card-subject, .mail-card.unread .mail-card-sender { font-weight: 700; color: #000; }
         
         .mail-card-content { flex: 1; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
-        .mail-card-top { display: flex; justify-content: space-between; font-size: 12px; color: #858585; }
-        .mail-card-sender { font-weight: 500; color: #cccccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mail-card-subject { font-size: 13px; color: #d4d4d4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mail-card-snippet { font-size: 12px; color: #858585; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-card-top { display: flex; justify-content: space-between; font-size: 12px; color: #5e5e5e; }
+        .mail-card-sender { font-weight: 500; color: #1f1f1f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-card-subject { font-size: 14px; color: #1f1f1f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-card-snippet { font-size: 12px; color: #5e5e5e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        .mail-reader-pane { flex: 1; padding: 30px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; background: #1e1e1e; }
-        .reader-subject { font-size: 22px; font-weight: 600; color: #ffffff; border-bottom: 1px solid #3f3f3f; padding-bottom: 14px; }
-        .reader-meta-box { display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 12px 16px; border: 1px solid #3f3f3f; border-radius: 4px; font-size: 13px; color: #aaaaaa; }
-        .reader-body { font-size: 14px; line-height: 1.6; color: #d4d4d4; white-space: pre-wrap; }
+        .mail-reader-pane { flex: 1; padding: 40px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; background: #ffffff; color: #1f1f1f; }
+        .reader-subject { font-size: 24px; font-weight: 400; color: #1f1f1f; border-bottom: 1px solid #dadce0; padding-bottom: 16px; }
+        .reader-meta-box { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 14px 18px; border: 1px solid #dadce0; border-radius: 8px; font-size: 13px; color: #444746; }
+        .reader-body { font-size: 15px; line-height: 1.7; color: #1f1f1f; white-space: pre-wrap; }
 
-        .creator-info-pane { flex: 1; padding: 40px; display: none; flex-direction: column; gap: 20px; background: #1e1e1e; overflow-y: auto; }
-        .creator-info-pane h2 { font-size: 24px; color: #4ec9b0; border-bottom: 2px solid #3f3f3f; padding-bottom: 10px; }
-        .creator-card-box { background: #252526; border: 1px solid #3f3f3f; border-radius: 6px; padding: 25px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; color: #d4d4d4; line-height: 1.6; }
-        .creator-card-box strong { color: #4ec9b0; }
+        .creator-info-pane { flex: 1; padding: 40px; display: none; flex-direction: column; gap: 20px; background: #ffffff; color: #1f1f1f; overflow-y: auto; }
+        .creator-info-pane h2 { font-size: 24px; color: #0b57d0; border-bottom: 1px solid #dadce0; padding-bottom: 12px; font-weight: 400; }
+        .creator-card-box { background: #f8f9fa; border: 1px solid #dadce0; border-radius: 16px; padding: 30px; display: flex; flex-direction: column; gap: 14px; font-size: 15px; color: #1f1f1f; line-height: 1.7; }
+        .creator-card-box strong { color: #0b57d0; }
 
-        .compose-pane { flex: 1; padding: 30px; display: none; flex-direction: column; gap: 16px; overflow-y: auto; background: #1e1e1e; }
-        .compose-pane h3 { font-size: 20px; font-weight: 600; color: #4ec9b0; border-bottom: 1px solid #3f3f3f; padding-bottom: 12px; }
-        .compose-form { display: flex; flex-direction: column; gap: 12px; max-width: 750px; }
-        .compose-field { display: flex; align-items: center; border: 1px solid #555; border-radius: 4px; overflow: hidden; background: #2d2d2d; }
-        .compose-field span { background: #333; padding: 10px 14px; font-size: 13px; font-weight: 600; color: #bbb; border-right: 1px solid #555; width: 90px; }
-        .compose-field input { flex: 1; padding: 10px 12px; border: none; font-size: 14px; outline: none; background: transparent; color: #fff; }
-        .compose-textarea { width: 100%; height: 280px; padding: 14px; border: 1px solid #555; border-radius: 4px; font-size: 14px; outline: none; resize: vertical; background: #2d2d2d; color: #fff; }
+        .compose-pane { flex: 1; padding: 40px; display: none; flex-direction: column; gap: 20px; overflow-y: auto; background: #ffffff; }
+        .compose-pane h3 { font-size: 22px; font-weight: 400; color: #1f1f1f; border-bottom: 1px solid #dadce0; padding-bottom: 14px; }
+        .compose-form { display: flex; flex-direction: column; gap: 16px; max-width: 800px; }
+        .compose-field { display: flex; align-items: center; border: 1px solid #747775; border-radius: 8px; background: #fff; overflow: hidden; }
+        .compose-field span { background: #f8f9fa; padding: 12px 16px; font-size: 13px; font-weight: 500; color: #444746; border-right: 1px solid #747775; width: 100px; }
+        .compose-field input { flex: 1; padding: 12px 14px; border: none; font-size: 15px; outline: none; background: transparent; color: #1f1f1f; }
+        .compose-textarea { width: 100%; height: 320px; padding: 16px; border: 1px solid #747775; border-radius: 8px; font-size: 15px; outline: none; resize: vertical; background: #fff; color: #1f1f1f; }
 
-        .empty-state { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: #858585; font-size: 14px; gap: 12px; text-align: center; }
+        .google-btn-primary {
+            background: #0b57d0; color: white; border: none; padding: 10px 24px;
+            font-size: 14px; cursor: pointer; font-weight: 500; border-radius: 100px;
+            transition: background 0.2s; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .google-btn-primary:hover { background: #0842a0; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+        .empty-state { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: #5e5e5e; font-size: 15px; gap: 12px; text-align: center; font-weight: 500; }
     </style>
 </head>
 <body>
 
-    <!-- Systemowe Okno Autoryzacji (Windows/Microsoft style) -->
-    <div id="auth-screen">
-        <div class="os-window">
-            <div class="os-window-header">
-                <span class="os-window-title" id="auth-window-title">RetroNet ID - Logowanie do systemu</span>
-                <span style="font-size: 12px; color: #777;">OS v2.5</span>
-            </div>
-            <div class="os-window-body">
-                <div id="step-credentials">
-                    <div class="input-group" style="margin-bottom: 12px;">
-                        <label>Typ konta</label>
-                        <select id="account-type" class="os-select">
-                            <option value="work">Praca (@retronet.call)</option>
-                            <option value="personal">Osobiste</option>
-                            <option value="child">Dla dziecka</option>
-                        </select>
-                    </div>
-
-                    <div class="input-group" style="margin-bottom: 12px;">
-                        <label>Nazwa użytkownika</label>
-                        <div class="input-wrapper">
-                            <input type="text" id="username-input" class="net-input" placeholder="np. karol">
-                            <span class="domain-tag" id="domain-label">@retronet.call</span>
-                        </div>
-                    </div>
-
-                    <div class="input-group" style="margin-bottom: 12px;" id="age-group">
-                        <label>Twój wiek</label>
-                        <div class="input-wrapper">
-                            <input type="number" id="age-input" class="net-input" placeholder="np. 14">
-                        </div>
-                    </div>
-
-                    <div class="input-group" style="margin-bottom: 12px;">
-                        <label>Hasło</label>
-                        <div class="input-wrapper">
-                            <input type="password" id="password-input" class="net-input" placeholder="••••••••">
-                        </div>
-                    </div>
-
-                    <div class="input-group" style="margin-bottom: 16px;" id="phone-group">
-                        <label>Numer telefonu (Weryfikacja SMS przez unpackge)</label>
-                        <div class="input-wrapper">
-                            <input type="text" id="phone-input" class="net-input" placeholder="+48 ...">
-                        </div>
-                    </div>
-
-                    <button id="primary-action-btn" class="os-btn" onclick="handleAuthAction()">Dalej / Zaloguj</button>
-                    <button id="secondary-action-btn" class="os-btn secondary" style="margin-top: 8px;" onclick="toggleAuthMode()">Nie masz konta? Zarejestruj się</button>
-                </div>
-
-                <!-- Krok weryfikacji kodem wysłanym przez bibliotekę paczkującą -->
-                <div id="step-verify" style="display: none; flex-direction: column; gap: 16px;">
-                    <p style="font-size: 13px; color: #444; line-height: 1.5;">Kod weryfikacyjny 6-cyfrowy został wygenerowany przez kontener weryfikacji SMS biblioteki unpackge.</p>
-                    <div class="input-group">
-                        <label>Kod weryfikacyjny (6 cyfr)</label>
-                        <div class="input-wrapper">
-                            <input type="text" id="sms-code-input" class="net-input" placeholder="123456" maxlength="6">
-                        </div>
-                    </div>
-                    <button class="os-btn" onclick="verifySmsAndComplete()">Potwierdź i sfinalizuj</button>
-                </div>
-
-                <div id="auth-error" class="error-msg"></div>
-            </div>
+    <header>
+        <div class="header-brand">
+            <span>PostEmail</span> <span style="font-size: 13px; font-weight: normal; color: #5e5e5e;">(RetroNet Workspace)</span>
         </div>
-    </div>
+        <div class="user-panel">
+            <span id="current-user-display" style="font-weight: 500;">Zalogowany</span>
+            <button class="logout-btn" onclick="netService.logout()">Wyloguj</button>
+        </div>
+    </header>
 
-    <!-- Główny Interfejs Aplikacji -->
-    <div id="app-screen">
-        <header>
-            <div class="header-brand">PostEmail Suite <span style="font-size: 11px; color: #858585; font-weight: normal;">(RetroNet Ecosystem)</span></div>
-            <div class="user-panel">
-                <span id="current-user-display">Zalogowany</span>
-                <button class="logout-btn" onclick="netService.logout()">Wyloguj</button>
-            </div>
-        </header>
-
-        <div class="main-workspace">
-            <nav class="sidebar">
-                <div class="sidebar-top">
-                    <button class="compose-main-btn" onclick="switchFolder('compose')">+ Nowa wiadomość</button>
-                    <button class="nav-item active" id="btn-inbox" onclick="switchFolder('inbox')">
+    <div class="main-workspace">
+        <nav class="sidebar">
+            <div class="sidebar-top">
+                <button class="compose-main-btn" onclick="switchFolder('compose')">
+                    <svg class="compose-icon-svg" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    Nowa wiadomość
+                </button>
+                <button class="nav-item active" id="btn-inbox" onclick="switchFolder('inbox')">
+                    <div class="nav-label-group">
+                        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8l7 5 7-5v11zm-7-7L5 6h14l-7 6z"/></svg>
                         <span>Odbiorcze</span>
-                        <span class="badge" id="inbox-badge">0</span>
-                    </button>
-                    <button class="nav-item" id="btn-sent" onclick="switchFolder('sent')">
+                    </div>
+                    <span class="badge" id="inbox-badge">0</span>
+                </button>
+                <button class="nav-item" id="btn-sent" onclick="switchFolder('sent')">
+                    <div class="nav-label-group">
+                        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                         <span>Wysłane</span>
+                    </div>
+                </button>
+                <button class="nav-item" id="btn-creator" onclick="switchFolder('creator')">
+                    <div class="nav-label-group">
+                        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                        <span>O twórcy</span>
+                    </div>
+                </button>
+            </div>
+        </nav>
+
+        <div class="content-workspace">
+            <div id="list-pane" class="mail-list-pane">
+                <div class="list-action-bar">
+                    <button class="action-icon-btn" title="Usuń zaznaczone" onclick="deleteSelectedEmails()">
+                        <svg class="action-icon-svg" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        Usuń
                     </button>
-                    <button class="nav-item" id="btn-creator" onclick="switchFolder('creator')">
-                        <span>ℹ O twórcy</span>
+                    <button class="action-icon-btn" title="Oznacz jako przeczytane" onclick="markSelectedReadStatus(true)">
+                        <svg class="action-icon-svg" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+                        Przeczytane
                     </button>
                 </div>
-            </nav>
+                <div class="mail-items-scroll" id="mail-items-container">
+                    <div style="padding: 25px; text-align: center; color: #5e5e5e; font-size: 13px;">Wczytywanie...</div>
+                </div>
+            </div>
 
-            <div class="content-workspace">
-                <div id="list-pane" class="mail-list-pane">
-                    <div class="list-action-bar">
-                        <button class="action-icon-btn" title="Usuń zaznaczone" onclick="deleteSelectedEmails()">🗑️</button>
-                        <button class="action-icon-btn" title="Oznacz jako przeczytane" onclick="markSelectedReadStatus(true)">✔️</button>
-                    </div>
-                    <div class="mail-items-scroll" id="mail-items-container">
-                        <div style="padding: 25px; text-align: center; color: #858585; font-size: 13px;">Wczytywanie...</div>
+            <div id="reader-pane" class="mail-reader-pane">
+                <div class="empty-state">Wybierz wiadomość z listy po lewej stronie.</div>
+            </div>
+
+            <div id="creator-pane" class="creator-info-pane">
+                <h2>Informacje o twórcy i usłudze</h2>
+                <div class="creator-card-box">
+                    <div><strong>Twórca projektu:</strong> Karol Kopeć</div>
+                    <div><strong>Wiek:</strong> 14 lat (klasa 7)</div>
+                    <div><strong>Szkoła:</strong> Szkoła Podstawowa nr 11 z Oddziałami Integracyjnymi im. Kornela Makuszyńskiego w Białymstoku (ul. Sienkiewicza)</div>
+                    <div><strong>Rok utworzenia:</strong> 2026</div>
+                    <div><strong>Wersja usługi:</strong> PostEmail v3.5 (Google & RetroNet Workspace)</div>
+                    <div><strong>System autoryzacji:</strong> RetroNet OS Auth v2.0</div>
+                    <div style="margin-top: 10px; font-size: 13px; color: #5e5e5e; border-top: 1px solid #dadce0; padding-top: 12px; font-weight: 500;">
+                        Wszystkie prawa autorskie do architektury ekosystemu RetroNet należą do twórcy.
                     </div>
                 </div>
+            </div>
 
-                <div id="reader-pane" class="mail-reader-pane">
-                    <div class="empty-state">Wybierz wiadomość z listy po lewej stronie.</div>
-                </div>
-
-                <div id="creator-pane" class="creator-info-pane">
-                    <h2>Informacje o twórcy i usłudze</h2>
-                    <div class="creator-card-box">
-                        <div><strong>Twórca projektu:</strong> Karol Kopeć</div>
-                        <div><strong>Wiek:</strong> 14 lat (klasa 7)</div>
-                        <div><strong>Szkoła:</strong> Szkoła Podstawowa nr 11 z Oddziałami Integracyjnymi im. Kornela Makuszyńskiego w Białymstoku (ul. Sienkiewicza)</div>
-                        <div><strong>Rok utworzenia:</strong> 2026</div>
-                        <div><strong>Wersja usługi:</strong> PostEmail v2.5</div>
-                        <div><strong>System autoryzacji:</strong> RetroNet OS Auth v2.0 (powiązany z unpackge)</div>
-                        <div style="margin-top: 10px; font-size: 13px; color: #858585; border-top: 1px solid #3f3f3f; padding-top: 10px;">
-                            Wszystkie prawa autorskie do architektury ekosystemu RetroNet należą do twórcy.
-                        </div>
-                    </div>
-                </div>
-
-                <div id="compose-pane" class="compose-pane">
-                    <h3>Nowa wiadomość e-mail</h3>
-                    <div class="compose-form">
-                        <div class="compose-field"><span>Do:</span><input type="text" id="email-to" placeholder="np. karol"></div>
-                        <div class="compose-field"><span>Temat:</span><input type="text" id="email-subject" placeholder="Temat"></div>
-                        <textarea class="compose-textarea" id="email-body" placeholder="Treść wiadomości..."></textarea>
-                        <button class="os-btn" style="width: auto; padding: 10px 24px;" onclick="sendEmail()">Wyślij wiadomość</button>
-                    </div>
+            <div id="compose-pane" class="compose-pane">
+                <h3>Nowa wiadomość e-mail</h3>
+                <div class="compose-form">
+                    <div class="compose-field"><span>Do:</span><input type="text" id="email-to" placeholder="np. karol"></div>
+                    <div class="compose-field"><span>Temat:</span><input type="text" id="email-subject" placeholder="Temat"></div>
+                    <textarea class="compose-textarea" id="email-body" placeholder="Treść wiadomości..."></textarea>
+                    <button class="google-btn-primary" style="width: auto; padding: 12px 30px;" onclick="sendEmail()">Wyślij wiadomość</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Menu Kontekstowe -->
-    <div id="context-menu" style="position: absolute; display: none; background: #252526; border: 1px solid #3f3f3f; box-shadow: 0 4px 12px rgba(0,0,0,0.4); border-radius: 4px; z-index: 1000; width: 180px; padding: 4px 0;">
-        <div style="padding: 8px 14px; font-size: 13px; cursor: pointer; color: #ccc;" onclick="ctxToggleRead()">Zmień stan</div>
-        <div style="height: 1px; background: #3f3f3f; margin: 4px 0;"></div>
-        <div style="padding: 8px 14px; font-size: 13px; cursor: pointer; color: #f87171;" onclick="ctxDeleteEmail()">Usuń</div>
+    <div id="context-menu" style="position: absolute; display: none; background: #ffffff; border: 1px solid #dadce0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; width: 180px; padding: 4px 0; border-radius: 8px;">
+        <div style="padding: 10px 14px; font-size: 13px; cursor: pointer; color: #1f1f1f; font-weight: 500;" onclick="ctxToggleRead()">Zmień stan</div>
+        <div style="height: 1px; background: #dadce0; margin: 2px 0;"></div>
+        <div style="padding: 10px 14px; font-size: 13px; cursor: pointer; color: #b3261e; font-weight: 500;" onclick="ctxDeleteEmail()">Usuń</div>
     </div>
 
     <script>
-        // ==========================================
-        // WPISZ TUTAJ SWOJĄ KONFIGURACJĘ FIREBASE API
-        // ==========================================
         const apiConfig = {
             urlfirebase: {
                 apiKey: "AIzaSyB7Q9TSXa4CQc2nSiUhS044wD463jBHpr0",
@@ -287,9 +206,6 @@
         };
 
         let netService = null;
-        let isRegisterMode = false;
-        let pendingRegistrationData = null;
-        let activeSmsToken = "";
         let currentUser = null;
         let currentFolder = "inbox";
         let allEmails = { inbox: [], sent: [] };
@@ -307,88 +223,13 @@
             netService.onAuthReady((session) => {
                 if (session) {
                     currentUser = session;
-                    document.getElementById('auth-screen').style.display = 'none';
-                    document.getElementById('app-screen').style.display = 'flex';
                     document.getElementById('current-user-display').innerText = session.fullAddress;
                     initListeners(session.fullAddress);
                 } else {
-                    document.getElementById('auth-screen').style.display = 'flex';
-                    document.getElementById('app-screen').style.display = 'none';
+                    window.location.href = "Auth.html";
                 }
             });
         });
-
-        function toggleAuthMode() {
-            isRegisterMode = !isRegisterMode;
-            document.getElementById('auth-window-title').innerText = isRegisterMode ? "RetroNet ID - Rejestracja w systemie" : "RetroNet ID - Logowanie do systemu";
-            document.getElementById('primary-action-btn').innerText = isRegisterMode ? "Dalej (Weryfikacja SMS)" : "Zaloguj się";
-            document.getElementById('secondary-action-btn').innerText = isRegisterMode ? "Masz już konto? Zaloguj się" : "Nie masz konta? Zarejestruj się";
-            
-            document.getElementById('age-group').style.display = isRegisterMode ? 'block' : 'none';
-            document.getElementById('phone-group').style.display = isRegisterMode ? 'block' : 'none';
-            document.getElementById('auth-error').innerText = "";
-        }
-
-        document.getElementById('age-group').style.display = 'none';
-        document.getElementById('phone-group').style.display = 'none';
-
-        function handleAuthAction() {
-            const u = document.getElementById('username-input').value.trim();
-            const p = document.getElementById('password-input').value;
-            const err = document.getElementById('auth-error');
-            err.innerText = "";
-
-            if (!u || !p) return err.innerText = "Wypełnij wymagane pola!";
-
-            if (!isRegisterMode) {
-                netService.login(u, p).catch(e => err.innerText = "Błąd logowania: " + e.message);
-            } else {
-                const age = document.getElementById('age-input').value.trim();
-                const phone = document.getElementById('phone-input').value.trim();
-                const accountType = document.getElementById('account-type').value;
-
-                if (!age || !phone) return err.innerText = "Podaj wiek oraz numer telefonu!";
-
-                // Spakowanie danych przez bibliotekę unpackge (lub strukturę kontenera paczkującego)
-                const payload = JSON.stringify({ username: u, password: p, age, phone, accountType, timestamp: Date.now() });
-                const packedContainer = btoa(payload); // Reprezentacja kontenera paczki
-
-                // Użycie unpackge do dekodowania paczki weryfikacyjnej
-                const unpackedObj = netService.unpackRegistrationPackage(packedContainer);
-                if (!unpackedObj) {
-                    return err.innerText = "Błąd kontenera unpackge: Nie udało się spakować danych.";
-                }
-
-                pendingRegistrationData = unpackedObj;
-                activeSmsToken = Math.floor(100000 + Math.random() * 900000).toString();
-
-                // Wysyłka kodu weryfikacyjnego przez bibliotekę unpackge SMS
-                console.log(`[unpackge SMS Gateway] Wysyłanie kodu ${activeSmsToken} na numer ${phone}`);
-                alert(`[unpackge SMS]: Wysłano kod weryfikacyjny na numer ${phone}. (Kod testowy: ${activeSmsToken})`);
-
-                document.getElementById('step-credentials').style.display = 'none';
-                document.getElementById('step-verify').style.display = 'flex';
-            }
-        }
-
-        function verifySmsAndComplete() {
-            const enteredCode = document.getElementById('sms-code-input').value.trim();
-            const err = document.getElementById('auth-error');
-
-            if (enteredCode !== activeSmsToken) {
-                return alert("Kod weryfikacyjny z biblioteki unpackge jest niepoprawny!");
-            }
-
-            netService.register(pendingRegistrationData.username, pendingRegistrationData.password, {
-                age: pendingRegistrationData.age,
-                accountType: pendingRegistrationData.accountType,
-                phone: pendingRegistrationData.phone
-            }).catch(e => {
-                err.innerText = "Rejestracja odrzucona: " + e.message;
-                document.getElementById('step-verify').style.display = 'none';
-                document.getElementById('step-credentials').style.display = 'block';
-            });
-        }
 
         function initListeners(address) {
             netService.db.collection('emails').where('to', '==', address)
@@ -404,7 +245,7 @@
                 .onSnapshot(snap => {
                     allEmails.sent = [];
                     snap.forEach(doc => allEmails.sent.push({ id: doc.id, ...doc.data() }));
-                    allEmails.sent.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                    allEmails.sent.sort((a, b) => (b.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
                     if (currentFolder === 'sent') renderList(allEmails.sent);
                 });
         }
@@ -413,7 +254,7 @@
             const container = document.getElementById('mail-items-container');
             container.innerHTML = "";
             if (list.length === 0) {
-                container.innerHTML = `<div style="padding: 25px; text-align: center; color: #858585; font-size: 13px;">Brak wiadomości.</div>`;
+                container.innerHTML = `<div style="padding: 25px; text-align: center; color: #5e5e5e; font-size: 13px;">Brak wiadomości.</div>`;
                 return;
             }
 
