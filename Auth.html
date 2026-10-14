@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RetroNet ID - Logowanie i Rejestracja</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
+    <!-- Serwisy RetroNet -->
+    <script src="RetroNetService.js"></script>
+    <script src="sms.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', 'Segoe UI', Arial, sans-serif; }
+        body { background-color: #ffffff; color: #1f1f1f; height: 100vh; display: flex; justify-content: center; align-items: center; }
+
+        .google-auth-card {
+            background: #ffffff; width: 450px; border-radius: 28px;
+            border: 1px solid #dadce0; padding: 40px; display: flex; flex-direction: column; align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08); position: relative;
+        }
+        
+        .retronet-logo-svg { width: 70px; height: 70px; margin-bottom: 8px; filter: drop-shadow(0px 3px 5px rgba(0, 120, 215, 0.3)); }
+
+        .google-title { font-size: 24px; font-weight: 400; color: #1f1f1f; margin-bottom: 8px; text-align: center; }
+        .google-subtitle { font-size: 15px; color: #444746; margin-bottom: 30px; text-align: center; }
+
+        .google-input-container { width: 100%; margin-bottom: 20px; position: relative; }
+        .google-input-field { width: 100%; padding: 16px; border: 1px solid #747775; border-radius: 4px; font-size: 16px; outline: none; background: transparent; color: #1f1f1f; transition: border-color 0.2s; }
+        .google-input-field:focus { border-color: #0b57d0; border-width: 2px; padding: 15px; }
+
+        .input-with-domain { display: flex; align-items: center; border: 1px solid #747775; border-radius: 4px; overflow: hidden; background: #fff; width: 100%; }
+        .input-with-domain:focus-within { border-color: #0b57d0; border-width: 2px; }
+        .input-with-domain input { flex: 1; padding: 16px; border: none; font-size: 16px; outline: none; background: transparent; }
+        .input-domain-suffix { background: #f8f9fa; color: #444746; padding: 16px 12px; font-size: 15px; border-left: 1px solid #747775; font-weight: 500; }
+
+        .google-actions { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px; }
+        
+        .google-btn-primary {
+            background: #0b57d0; color: white; border: none; padding: 10px 24px;
+            font-size: 14px; cursor: pointer; font-weight: 500; border-radius: 100px;
+            transition: background 0.2s;
+        }
+        .google-btn-primary:hover { background: #0842a0; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+        .google-btn-text { background: transparent; color: #0b57d0; border: none; font-size: 14px; font-weight: 500; cursor: pointer; padding: 10px; }
+        .google-btn-text:hover { background: rgba(11, 87, 208, 0.04); border-radius: 100px; }
+
+        /* Rozwijane okno dialogowe wyboru typu konta */
+        #account-type-dropdown {
+            position: absolute; bottom: 70px; left: 40px; background: #ffffff; border: 1px solid #dadce0;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15); border-radius: 12px; width: 280px; z-index: 300; display: none; padding: 8px 0;
+        }
+        .dropdown-option { padding: 12px 20px; font-size: 14px; color: #1f1f1f; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        .dropdown-option:hover { background: #f8f9fa; color: #0b57d0; }
+
+        .error-msg { color: #b3261e; font-size: 13px; text-align: center; margin-top: 15px; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+    <div class="google-auth-card">
+        <!-- Logo RetroNet z błękitnym efektem Aero -->
+        <svg class="retronet-logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="aeroBlueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#33b5e5" />
+                    <stop offset="50%" stop-color="#0085cf" />
+                    <stop offset="100%" stop-color="#004385" />
+                </linearGradient>
+                <linearGradient id="aeroHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6" />
+                    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0" />
+                </linearGradient>
+            </defs>
+            <path fill="url(#aeroBlueGrad)" stroke="#002d5a" stroke-width="1.5" d="M22,25 C15,18 35,8 45,18 C55,28 35,42 22,40 C18,39 16,33 25,32 C35,31 42,38 48,45 C55,53 62,62 70,72 C75,78 82,85 88,80 C93,76 85,70 80,65 C70,55 58,42 48,32 C58,30 68,22 65,12 C62,4 42,8 35,16 C28,24 25,22 22,25 Z"/>
+            <path fill="url(#aeroBlueGrad)" stroke="#002d5a" stroke-width="1.5" d="M28,15 C26,35 24,55 22,75 C21,83 29,85 32,80 C34,75 35,45 36,35 C42,35 55,38 62,48 C69,58 75,72 82,82 C85,86 92,80 88,75 C80,62 70,48 62,38 C54,28 42,22 28,15 Z"/>
+            <path fill="url(#aeroHighlight)" d="M29,17 C35,20 48,25 54,32 C42,33 34,26 29,17 Z"/>
+        </svg>
+
+        <div class="google-title" id="auth-main-title">Zaloguj się</div>
+        <div class="google-subtitle" id="auth-main-subtitle">do konta RetroNet ID</div>
+        
+        <!-- Krok wprowadzania danych -->
+        <div id="step-credentials" style="width: 100%;">
+            <div class="google-input-container">
+                <div class="input-with-domain">
+                    <input type="text" id="username-input" placeholder="Nazwa konta lub e-mail">
+                    <span class="input-domain-suffix">@retronet.call</span>
+                </div>
+            </div>
+
+            <div class="google-input-container" id="password-container">
+                <input type="password" id="password-input" class="google-input-field" placeholder="Wprowadź hasło">
+            </div>
+
+            <div class="google-input-container" id="age-container" style="display: none;">
+                <input type="number" id="age-input" class="google-input-field" placeholder="Twój wiek (np. 14)">
+            </div>
+
+            <div class="google-input-container" id="phone-container" style="display: none;">
+                <input type="text" id="phone-input" class="google-input-field" placeholder="Numer telefonu (np. +48...)">
+            </div>
+
+            <div class="google-actions">
+                <div style="position: relative;">
+                    <button id="create-account-toggle" class="google-btn-text" onclick="toggleAccountMenu()">Utwórz konto</button>
+                    <!-- Okno dialogowe wyboru typu konta -->
+                    <div id="account-type-dropdown">
+                        <div class="dropdown-option" onclick="selectAccountType('personal')">Do użytku osobistego</div>
+                        <div class="dropdown-option" onclick="selectAccountType('child')">Dla dziecka</div>
+                        <div class="dropdown-option" onclick="selectAccountType('work')">Do pracy lub celów biznesowych</div>
+                    </div>
+                </div>
+                <button id="primary-action-btn" class="google-btn-primary" onclick="handleAuthAction()">Dalej</button>
+            </div>
+        </div>
+
+        <!-- Krok weryfikacji SMS -->
+        <div id="step-verify" style="display: none; flex-direction: column; gap: 16px; width: 100%;">
+            <p style="font-size: 14px; color: #444746; line-height: 1.5; text-align: center;">Wpisz kod weryfikacyjny wysłany przez bramkę komercyjną (nadawca: <strong>RetroNet</strong>).</p>
+            <div class="google-input-container">
+                <input type="text" id="sms-code-input" class="google-input-field" placeholder="Wprowadź 6-cyfrowy kod" maxlength="6">
+            </div>
+            <button class="google-btn-primary" style="width: 100%; padding: 12px;" onclick="verifySmsAndComplete()">Potwierdź kod</button>
+        </div>
+
+        <div id="auth-error" class="error-msg"></div>
+    </div>
+
+    <script>
+        const apiConfig = {
+            urlfirebase: {
+                apiKey: "AIzaSyB7Q9TSXa4CQc2nSiUhS044wD463jBHpr0",
+                authDomain: "retronetcall.firebaseapp.com",
+                projectId: "retronetcall",
+                storageBucket: "retronetcall.firebasestorage.app",
+                messagingSenderId: "820407833858",
+                appId: "1:820407833858:web:e4e1cc71f364955b3bde1b"
+            }
+        };
+
+        let netService = null;
+        let isRegisterMode = false;
+        let selectedAccountType = "personal";
+        let pendingRegistrationData = null;
+        let activeSmsToken = "";
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof RetroNetService === 'undefined' || typeof RetroNetSMS === 'undefined') {
+                alert("Błąd: Brak bibliotek RetroNetService.js lub sms.js!");
+                return;
+            }
+            netService = RetroNetService.init(apiConfig.urlfirebase);
+
+            netService.auth.onAuthStateChanged((user) => {
+                if (user) window.location.href = "index.html";
+            });
+        });
+
+        function toggleAccountMenu() {
+            const dropdown = document.getElementById('account-type-dropdown');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#create-account-toggle') && !e.target.closest('#account-type-dropdown')) {
+                document.getElementById('account-type-dropdown').style.display = 'none';
+            }
+        });
+
+        function selectAccountType(type) {
+            selectedAccountType = type;
+            document.getElementById('account-type-dropdown').style.display = 'none';
+            isRegisterMode = true;
+
+            document.getElementById('auth-main-title').innerText = "Utwórz konto RetroNet";
+            document.getElementById('auth-main-subtitle').innerText = type === 'child' ? "Dla dziecka" : (type === 'work' ? "Do pracy lub celów biznesowych" : "Do użytku osobistego");
+            document.getElementById('create-account-toggle').style.display = 'none';
+            document.getElementById('primary-action-btn').innerText = "Dalej (SMS Gateway)";
+
+            document.getElementById('age-container').style.display = 'block';
+            document.getElementById('phone-container').style.display = 'block';
+            document.getElementById('auth-error').innerText = "";
+        }
+
+        async function handleAuthAction() {
+            const u = document.getElementById('username-input').value.trim();
+            const p = document.getElementById('password-input').value;
+            const err = document.getElementById('auth-error');
+            err.innerText = "";
+
+            if (!u || !p) return err.innerText = "Wpisz nazwę użytkownika oraz hasło.";
+
+            if (!isRegisterMode) {
+                netService.login(u, p).then(() => {
+                    window.location.href = "index.html";
+                }).catch(e => err.innerText = "Błąd logowania: " + e.message);
+            } else {
+                const age = document.getElementById('age-input').value.trim();
+                const phone = document.getElementById('phone-input').value.trim();
+
+                if (!age || !phone) return err.innerText = "Podaj wiek oraz numer telefonu.";
+
+                const payload = JSON.stringify({ username: u, password: p, age, phone, accountType: selectedAccountType, timestamp: Date.now() });
+                const packedContainer = btoa(payload);
+
+                const unpackedObj = netService.unpackRegistrationPackage(packedContainer);
+                if (!unpackedObj) {
+                    return err.innerText = "Błąd kontenera unpackge: Nie udało się spakować kontenera.";
+                }
+
+                pendingRegistrationData = unpackedObj;
+                activeSmsToken = RetroNetSMS.generateToken();
+
+                try {
+                    // Wywołanie prawdziwej bramki SMS (SMSAPI / Twilio)
+                    await RetroNetSMS.sendSms(phone, activeSmsToken);
+                    
+                    document.getElementById('step-credentials').style.display = 'none';
+                    document.getElementById('step-verify').style.display = 'flex';
+                } catch (e) {
+                    err.innerText = "Nie udało się wysłać wiadomości SMS przez bramkę: " + e.message;
+                }
+            }
+        }
+
+        function verifySmsAndComplete() {
+            const enteredCode = document.getElementById('sms-code-input').value.trim();
+            const err = document.getElementById('auth-error');
+
+            if (enteredCode !== activeSmsToken) {
+                return alert("Wprowadzony kod weryfikacyjny jest niepoprawny!");
+            }
+
+            netService.register(pendingRegistrationData.username, pendingRegistrationData.password, {
+                age: pendingRegistrationData.age,
+                accountType: pendingRegistrationData.accountType,
+                phone: pendingRegistrationData.phone
+            }).then(() => {
+                window.location.href = "index.html";
+            }).catch(e => {
+                err.innerText = "Rejestracja odrzucona: " + e.message;
+                document.getElementById('step-verify').style.display = 'none';
+                document.getElementById('step-credentials').style.display = 'flex';
+            });
+        }
+    </script>
+</body>
+</html>
